@@ -1,0 +1,1910 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Pro-X Ultimate CMMS</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0f172a;--card:#1e293b;--border:#334155;--inp:#0f172a;--text:#f8fafc;--dim:#94a3b8;--mute:#64748b;--amber:#f59e0b;--red:#ef4444;--green:#10b981;--blue:#3b82f6;--purple:#8b5cf6}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px; position:relative;}
+.btn{padding:10px 16px;border:none;border-radius:8px;font-family:'Outfit',sans-serif;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s}
+.btn:active{transform:scale(.97)}
+.btn-amber{background:var(--amber);color:#000}.btn-red{background:var(--red);color:#fff}.btn-green{background:var(--green);color:#fff}.btn-blue{background:var(--blue);color:#fff}.btn-purple{background:var(--purple);color:#fff}
+.btn-ghost{background:transparent;color:var(--dim);border:1px solid var(--border)}.btn-ghost:hover{color:var(--text); border-color:var(--dim)}
+.btn-dng{background:rgba(239,68,68,0.1);color:var(--red);border:1px solid rgba(239,68,68,0.2)}.btn-dng:hover{background:var(--red);color:#fff}
+.btn-sm{padding:6px 10px;font-size:11px;border-radius:6px}
+.inp{width:100%;padding:10px 12px;background:var(--inp);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;}
+.inp:focus{border-color:var(--blue)}.inp::placeholder{color:var(--mute)}
+select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%2394a3b8' d='M5 7L1 3h8z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
+textarea.inp{resize:vertical;min-height:80px}
+.lbl{font-size:11px;color:var(--mute);font-weight:600;margin-bottom:4px;display:flex;align-items:center;letter-spacing:.5px;text-transform:uppercase;}
+.badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:20px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;}
+.tabs{display:flex;gap:4px;background:var(--inp);border-radius:10px;padding:4px;border:1px solid var(--border);overflow-x:auto;}
+.tab{flex:1;padding:8px 12px;text-align:center;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;color:var(--dim);transition:all .2s;white-space:nowrap;user-select:none;}
+.tab.active{background:var(--blue);color:#fff}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.grid-4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px}
+
+.g-auto{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px; align-items:start;}
+
+.overlay{position:fixed;inset:0;background:rgba(15,23,42,.95);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px;backdrop-filter:blur(5px);}
+.mbody{max-width:650px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,0.8); display:flex; flex-direction:column; gap:16px;}
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;padding:12px 24px;border-radius:12px;font-weight:700;font-size:14px;z-index:2000;box-shadow:0 10px 30px rgba(16, 185, 129, 0.4)}
+.loading{position:fixed;inset:0;background:rgba(15, 23, 42, 0.9);display:flex;flex-direction:column;gap:15px;align-items:center;justify-content:center;z-index:3000;color:white;font-weight:700;font-size:18px;}
+.spinner{width:40px;height:40px;border:4px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+@keyframes pulse-red { 0% {box-shadow: 0 0 0 0 rgba(239,68,68,0.4);} 70% {box-shadow: 0 0 0 10px rgba(239,68,68,0);} 100% {box-shadow: 0 0 0 0 rgba(239,68,68,0);} }
+@keyframes pulse-amber { 0% {box-shadow: 0 0 0 0 rgba(245,158,11,0.4);} 70% {box-shadow: 0 0 0 10px rgba(245,158,11,0);} 100% {box-shadow: 0 0 0 0 rgba(245,158,11,0);} }
+.pulse-fault { animation: pulse-red 2s infinite; border-color: rgba(239,68,68,0.6) !important; }
+.pulse-stopped { animation: pulse-amber 2s infinite; border-color: rgba(245,158,11,0.6) !important; }
+
+.mini-prog-bg { height: 6px; background: var(--inp); border-radius: 3px; overflow: hidden; margin-top: 4px; border:1px solid rgba(255,255,255,0.05);}
+.mini-prog-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
+
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{text-align:left;padding:12px 8px;color:var(--mute);border-bottom:1px solid var(--border);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;}
+td{padding:12px 8px;border-bottom:1px solid var(--border);color:var(--text);}
+tr:hover td{background:rgba(255,255,255,0.03);}
+.clickable-row{cursor:pointer; transition:background 0.2s;}
+.clickable-row:hover{background:rgba(59, 130, 246, 0.1);}
+.clickable-card{cursor:pointer; transition:transform 0.2s ease, border-color 0.2s ease;}
+.clickable-card:hover{transform:scale(1.02); border-color:var(--dim);}
+
+.prog-container{height:10px;background:var(--inp);border-radius:5px;overflow:hidden;margin-top:8px;border:1px solid var(--border);}
+.prog-fill{height:100%;border-radius:5px;transition:width 0.3s ease;}
+.chk-item{display:flex;align-items:flex-start;gap:10px;padding:12px;background:var(--inp);border:1px solid var(--border);border-radius:8px;cursor:pointer;user-select:none;}
+.chk-item.done{border-color:var(--green);background:rgba(16,185,129,0.05);}
+.chkbox{width:20px;height:20px;border-radius:5px;border:2px solid var(--dim);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;}
+.chkbox.done{background:var(--green);border-color:var(--green);color:white;}
+.filters{display:flex;gap:10px;background:var(--inp);padding:10px;border-radius:10px;border:1px solid var(--border);align-items:center;flex-wrap:wrap;margin-bottom:16px;}
+.search-bar{display:flex;align-items:center;background:var(--inp);border:1px solid var(--border);border-radius:8px;padding:0 12px;width:100%;max-width:400px;}
+.search-bar input{background:transparent;border:none;color:var(--text);padding:10px 0;width:100%;font-family:'Outfit';outline:none;}
+@media(max-width:800px){.grid-4{grid-template-columns:1fr 1fr}}
+
+.bulk-btn-float { position: fixed; bottom: 30px; right: 30px; z-index: 900; box-shadow: 0 10px 30px rgba(0,0,0,0.5); padding: 16px 24px; font-size: 15px; animation: popUp 0.3s ease forwards; }
+@keyframes popUp { from{transform:scale(0.8); opacity:0;} to{transform:scale(1); opacity:1;} }
+.mac-check { position:absolute; top:12px; right:12px; width:22px; height:22px; cursor:pointer; accent-color:var(--blue); }
+
+.info-icon { display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; border-radius:50%; background:var(--blue); color:white; font-size:10px; margin-left:6px; cursor:help; font-weight:900; font-family:sans-serif; flex-shrink:0; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<script type="text/babel">
+const { useState, useEffect, useMemo } = React;
+
+// ⚠️ BURAYA KENDİ DAĞITIM URL'NİZİ YAPIŞTIRIN!
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwagKI2Om_TGRXMAS3CvIp-r9PZOSVNqf-VkVgFmPdUGORAwT-Y1_nx1SSSMTT5Rr0s/exec";
+
+// ========================================================
+// MESAİ SAATLERİ VE GÜNLERİ (5 Gün - 08:00 / 17:30)
+// ========================================================
+const GLOBAL_SHIFT_START = "08:00";
+const GLOBAL_SHIFT_END = "17:30";
+
+// --- MESAİ İÇİ DURUŞ HESAPLAMA MOTORU (HAFTASONU HARİÇ) ---
+const calcShiftDowntime = (startStr, endStr, shiftStart = GLOBAL_SHIFT_START, shiftEnd = GLOBAL_SHIFT_END) => {
+  const start = new Date(startStr);
+  const end = new Date(endStr);
+  if (isNaN(start) || isNaN(end) || start >= end) return 0;
+
+  let totalMinutes = 0;
+  let current = new Date(start);
+  const [sH, sM] = shiftStart.split(':').map(Number);
+  const [eH, eM] = shiftEnd.split(':').map(Number);
+  let loopLimit = 0; 
+
+  while (current < end && loopLimit < 365) { 
+    const dayOfWeek = current.getDay(); 
+    
+    // Cumartesi (6) veya Pazar (0) ise hesaplamadan atla
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      let dayShiftStart = new Date(current);
+      dayShiftStart.setHours(sH, sM, 0, 0);
+
+      let dayShiftEnd = new Date(current);
+      dayShiftEnd.setHours(eH, eM, 0, 0);
+
+      let overlapStart = current > dayShiftStart ? current : dayShiftStart;
+      let overlapEnd = end < dayShiftEnd ? end : dayShiftEnd;
+
+      if (overlapEnd > overlapStart) {
+        totalMinutes += (overlapEnd - overlapStart) / 60000;
+      }
+    }
+
+    current.setDate(current.getDate() + 1);
+    current.setHours(0, 0, 0, 0); 
+    loopLimit++;
+  }
+  return Math.round(totalMinutes);
+};
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+
+// TİMEZONE ZIRHI (TARİH OKUMA)
+const safeTime = d => { 
+  if(!d) return 0;
+  let str = String(d);
+  if(str.includes(" ")) str = str.replace(" ", "T"); 
+  const t = new Date(str).getTime(); 
+  return isNaN(t) ? 0 : t; 
+};
+
+const fd = (d, onlyDate=false) => {
+  if(!d) return "—";
+  try {
+    let str = String(d);
+    if(str.includes(" ")) str = str.replace(" ", "T");
+    const dt = new Date(str);
+    if(isNaN(dt.getTime())) return "—"; 
+    if (onlyDate) return dt.toLocaleDateString("tr-TR", {day:"2-digit", month:"2-digit", year:"numeric"});
+    return dt.toLocaleString("tr-TR", {day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit"});
+  } catch(e) { return "—"; }
+};
+
+const toYMD = d => { let str = String(d); if(str.includes(" ")) str = str.replace(" ", "T"); const dt = new Date(str); if(isNaN(dt.getTime())) return ""; const y = dt.getFullYear(), m = String(dt.getMonth()+1).padStart(2,'0'), day = String(dt.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; };
+const toDTL = (d) => { let str = String(d); if(str.includes(" ")) str = str.replace(" ", "T"); const dt = d ? new Date(str) : new Date(); if(isNaN(dt.getTime())) return ""; const pad = n => String(n).padStart(2,'0'); return `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`; };
+
+const parseJSON = (str, fallback) => { 
+  if (typeof str === 'object' && str !== null) return str;
+  try { return JSON.parse(str || JSON.stringify(fallback)); } catch(e) { return fallback; } 
+};
+const safeArr = (v) => Array.isArray(v) ? v : [];
+const safeObj = (v) => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+const safeStr = (v) => (v === null || v === undefined) ? "" : String(v);
+
+const InfoBtn = ({ msg }) => (
+  <span className="info-icon" title={msg} onClick={e => e.stopPropagation()}>?</span>
+);
+
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error: error }; }
+  componentDidCatch(error, errorInfo) { console.error("Hata Yakalandı:", error, errorInfo); }
+  render() {
+    if (this.state.hasError) {
+      return ( 
+        <div style={{padding: '40px', background: 'white', color: 'red', border: '5px solid red', margin: '20px', textAlign: 'center'}}>
+          <h2 style={{fontSize: '24px', fontWeight: 'bold'}}>⚠️ SİSTEMDE BİR ÇAKIŞMA OLDU</h2>
+          <p>Lütfen sayfayı yenileyin. Hata devam ederse boş bir veri kaydı sebep oluyor olabilir.</p>
+          <p style={{fontSize:'12px', marginTop:'10px'}}>{this.state.error?.toString()}</p>
+          <button className="btn btn-red" onClick={() => window.location.reload()} style={{marginTop:'20px'}}>Sayfayı Yenile</button>
+        </div> 
+      );
+    }
+    return this.props.children; 
+  }
+}
+
+// --- LİDERLİK TABLOSU ---
+const LeaderboardModal = ({ type, data, filtMonth, onClose, onSelectMac }) => {
+  const [filtCat, setFiltCat] = useState("");
+
+  const rankedList = useMemo(() => {
+    let macs = safeArr(data.machines);
+    if (filtCat) macs = macs.filter(m => m && m.catId === filtCat);
+
+    return macs.map(mac => {
+      if (!mac) return null;
+      let totalMins = 0, fCount = 0;
+      safeArr(data.faults).forEach(f => {
+        if (f && f.macId === mac.id && f.status === "closed" && f.type !== "bakim") {
+          if (filtMonth && f.end && !toYMD(f.end).startsWith(filtMonth)) return;
+          totalMins += (Number(f.downtime) || 0);
+          if (f.type === "ariza") fCount++;
+        }
+      });
+      return { ...mac, totalMins, fCount };
+    }).filter(m => m && (type === 'downtime' ? m.totalMins > 0 : m.fCount > 0))
+      .sort((a, b) => type === 'downtime' ? b.totalMins - a.totalMins : b.fCount - a.fCount);
+  }, [data.machines, data.faults, filtCat, filtMonth, type]);
+
+  return (
+    <div className="overlay" style={{zIndex:3500}} onClick={onClose}>
+      <div className="card mbody" onClick={e=>e.stopPropagation()}>
+        <ErrorBoundary>
+          <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:15}}>
+            <div>
+               <h3 style={{color: type==='downtime'?"var(--red)":"var(--amber)"}}>
+                 {type === 'downtime' ? "Makine Sıralaması: En Çok Duruş Yaşayanlar" : "Makine Sıralaması: En Çok Arıza Yapanlar"}
+               </h3>
+               <div style={{fontSize:11, color:"var(--dim)"}}>Filtre: {filtMonth || "Tüm Zamanlar"}</div>
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+          </div>
+
+          <div className="filters">
+            <span className="lbl" style={{marginBottom:0}}>KATEGORİ FİLTRESİ: <InfoBtn msg="Sadece seçilen kategoriye ait makineleri listeler." /></span>
+            <select className="inp" value={filtCat} onChange={e=>setFiltCat(e.target.value)} style={{width:'auto'}}>
+              <option value="">-- Tümü --</option>
+              {safeArr(data.categories).map(c => c && <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+
+          <div style={{maxHeight: 400, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8}}>
+            <table style={{width: "100%"}}>
+              <thead style={{background: "var(--inp)", position: "sticky", top: 0}}>
+                <tr>
+                  <th style={{width: 40}}>#</th>
+                  <th>Makine Adı</th>
+                  <th style={{textAlign:"right"}}>
+                    <div style={{display:"flex", alignItems:"center", justifyContent:"flex-end"}}>
+                      {type === 'downtime' ? "Toplam Duruş" : "Arıza Sayısı"} <InfoBtn msg={type === 'downtime' ? "Seçili tarihlerdeki toplam duruş dakikası." : "Seçili tarihlerdeki toplam mekanik/elektrik bozulma sayısı."} />
+                    </div>
+                  </th>
+                  <th style={{textAlign:"center", width:80}}>İşlem</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rankedList.length === 0 && <tr><td colSpan="4" style={{textAlign:"center", padding:20}}>Kayıt bulunamadı.</td></tr>}
+                {rankedList.map((m, idx) => (
+                  <tr key={m.id} className="clickable-row" onClick={() => onSelectMac(m)}>
+                    <td style={{fontWeight:800, color:"var(--dim)"}}>{idx + 1}</td>
+                    <td style={{fontWeight:800, color:"var(--blue)"}}>{m.name}</td>
+                    <td style={{textAlign:"right", fontWeight:900, color: type==='downtime'?"var(--red)":"var(--amber)"}}>
+                      {type === 'downtime' ? `${m.totalMins} dk` : `${m.fCount} Kez`}
+                    </td>
+                    <td style={{textAlign:"center"}}><button className="btn btn-ghost btn-xs">İncele</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </ErrorBoundary>
+      </div>
+    </div>
+  );
+};
+
+function ConfirmModal({ msg, onYes, onNo }) {
+  return (
+    <div className="overlay" style={{zIndex:5000}} onClick={onNo}>
+      <div className="card mbody" style={{maxWidth:350, textAlign:"center"}} onClick={e=>e.stopPropagation()}>
+        <h3 style={{color:"var(--red)", marginBottom:10}}>Uyarı</h3>
+        <p style={{marginBottom:20}}>{msg}</p>
+        <div className="grid-2">
+          <button className="btn btn-ghost" style={{justifyContent:"center"}} onClick={onNo}>Vazgeç</button>
+          <button className="btn btn-red" style={{justifyContent:"center"}} onClick={onYes}>Onayla</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- DÜZENLEME MODALI ---
+const RecordDetailModal = ({ record, type, macName, onClose, sendData, checkPw }) => {
+  const [isEdit, setIsEdit] = useState(false);
+  const [reason, setReason] = useState(record.reason || "");
+  const [desc, setDesc] = useState(record.desc || "");
+  const [downtime, setDowntime] = useState(record.downtime || 0);
+  const [closedBy, setClosedBy] = useState(record.closedBy || "");
+  const [closeNote, setCloseNote] = useState(record.closeNote || "");
+  const [materials, setMaterials] = useState(record.materials || ""); 
+  
+  const [person, setPerson] = useState(record.by || "");
+  const [notes, setNotes] = useState(record.notes || "");
+  const [checks, setChecks] = useState(record.checks || "");
+
+  const handleSave = async () => {
+    if (type === "fault" && Number(downtime) < 0) {
+       return alert("HATA: Duruş süresi eksi (-) bir değer olamaz!");
+    }
+
+    let success = false;
+    if(type === "fault") {
+      success = await sendData("update_fault", { id: record.id, reason, desc, downtime, closedBy, closeNote, materials });
+    } else {
+      success = await sendData("update_maint", { id: record.id, person, notes, checks });
+    }
+    if(success) { setIsEdit(false); onClose(); }
+  };
+
+  return (
+    <div className="overlay" style={{zIndex:4000}} onClick={onClose}>
+      <div className="card mbody" onClick={e=>e.stopPropagation()}>
+        <ErrorBoundary>
+          <React.Fragment>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", borderBottom:"1px solid var(--border)", paddingBottom:15}}>
+              <div>
+                <h3 style={{color:"var(--blue)", fontSize:18}}>{type === "fault" ? "Arıza & Duruş Raporu" : "Bakım Raporu"}</h3>
+                <div style={{fontSize:12, color:"var(--dim)", marginTop:4}}>{safeStr(macName)} • {type==="fault"?fd(record.start):fd(record.date)}</div>
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+            </div>
+            {!isEdit ? (
+              <div style={{display:"flex", flexDirection:"column", gap:12}}>
+                {type === "fault" ? (
+                  <>
+                    <div className="grid-2">
+                      <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">BİLDİREN <InfoBtn msg="Arızayı/duruşu sisteme giren operatör veya personel." /></div><div style={{fontWeight:600}}>{safeStr(record.by)}</div></div>
+                      <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">KAPATAN <InfoBtn msg="Arızayı onarıp sistemi tekrar devreye alan bakım personeli." /></div><div style={{fontWeight:600}}>{safeStr(record.closedBy)}</div></div>
+                    </div>
+                    <div style={{background:"var(--inp)", padding:12, borderRadius:8}}>
+                      <div className="lbl">DURUŞ SEBEBİ & TİPİ <InfoBtn msg="Sisteme girilen ana duruş kategorisi." /></div>
+                      <div style={{fontWeight:700, color:"var(--amber)", fontSize:14}}>{safeStr(record.reason)} <span style={{fontSize:12, color:"var(--mute)"}}>({safeStr(record.type || "Bilinmiyor").toUpperCase()})</span></div>
+                    </div>
+                    <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">BİLDİRİM AÇIKLAMASI <InfoBtn msg="Operatörün arıza anında düştüğü not." /></div><div style={{color:"var(--text)"}}>{safeStr(record.desc)}</div></div>
+                    <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">YAPILAN İŞLEM NOTU <InfoBtn msg="Bakım ekibinin sorunu nasıl çözdüğüne dair girdiği not." /></div><div style={{color:"var(--green)"}}>{safeStr(record.closeNote)}</div></div>
+                    <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">DEĞİŞEN PARÇA / MALZEME <InfoBtn msg="Tamir esnasında yenisiyle değiştirilen parçalar." /></div><div style={{color:"var(--amber)", fontWeight:"bold"}}>{safeStr(record.materials) || "Kullanılmadı"}</div></div>
+                    <div style={{background:"var(--inp)", padding:12, borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                      <div className="lbl" style={{margin:0}}>TOPLAM DURUŞ SÜRESİ <InfoBtn msg="Bildirim anı ile kapatılma anı arasında geçen net dakika." /></div>
+                      <div style={{fontWeight:900, color:"var(--red)", fontSize:18}}>{safeStr(record.downtime)} dk</div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="grid-2">
+                      <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">BAKIMI YAPAN <InfoBtn msg="Planlı bakımı gerçekleştiren personel." /></div><div style={{fontWeight:600}}>{safeStr(record.by)}</div></div>
+                      <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">BAKIM ŞABLONU <InfoBtn msg="Uygulanan bakımın türü ve periyodu." /></div><div style={{fontWeight:600, color:"var(--blue)"}}>{safeStr(record.type)}</div></div>
+                    </div>
+                    <div style={{background:"var(--inp)", padding:12, borderRadius:8}}>
+                      <div className="lbl">YAPILAN KONTROLLER <InfoBtn msg="Bakım sırasında onaylanan/kontrol edilen maddeler." /></div>
+                      <div style={{color:"var(--text)", lineHeight:1.5}}>
+                        {record.checks ? safeStr(record.checks).split(',').map((c,i)=><div key={i}>✓ {safeStr(c).trim()}</div>) : <div style={{color:"var(--dim)"}}>İşaretlenen madde yok.</div>}
+                      </div>
+                    </div>
+                    {record.notes && <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">EKSTRA NOTLAR</div><div style={{color:"var(--dim)"}}>{safeStr(record.notes)}</div></div>}
+                  </>
+                )}
+                <button className="btn btn-ghost" style={{justifyContent:"center", marginTop:10}} onClick={()=>checkPw(() => setIsEdit(true))}>✏️ Kaydı Düzenle (Şifreli)</button>
+              </div>
+            ) : (
+              <div style={{display:"flex", flexDirection:"column", gap:12}}>
+                <div style={{padding:10, background:"rgba(245, 158, 11, 0.1)", color:"var(--amber)", borderRadius:8, fontSize:12, textAlign:"center"}}>
+                  ⚠️ <b>Düzenleme Modu:</b> Değişiklikler istatistikleri ve sayaçları etkiler.
+                </div>
+                {type === "fault" ? (
+                  <>
+                    <div><label className="lbl">Duruş Sebebi <InfoBtn msg="Arızanın türünü değiştirir." /></label><input className="inp" value={reason} onChange={e=>setReason(e.target.value)} /></div>
+                    <div><label className="lbl">Bildirim Açıklaması</label><textarea className="inp" style={{minHeight:50}} value={desc} onChange={e=>setDesc(e.target.value)} /></div>
+                    <div className="grid-2">
+                      <div><label className="lbl">Kapatan Bakımcı</label><input className="inp" value={closedBy} onChange={e=>setClosedBy(e.target.value)} /></div>
+                      <div><label className="lbl">Duruş Süresi (Dakika) <InfoBtn msg="Eksi değer girilemez." /></label><input type="number" min="0" className="inp" value={downtime} onChange={e=>setDowntime(e.target.value)} /></div>
+                    </div>
+                    <div><label className="lbl">Yapılan İşlem Notu</label><textarea className="inp" style={{minHeight:50}} value={closeNote} onChange={e=>setCloseNote(e.target.value)} /></div>
+                    <div><label className="lbl">Değişen Parça / Malzeme</label><textarea className="inp" style={{minHeight:50}} value={materials} onChange={e=>setMaterials(e.target.value)} /></div>
+                  </>
+                ) : (
+                  <>
+                    <div><label className="lbl">Bakımı Yapan</label><input className="inp" value={person} onChange={e=>setPerson(e.target.value)} /></div>
+                    <div><label className="lbl">Yapılan Kontroller (Virgülle ayırın) <InfoBtn msg="Manuel olarak madde ekleyip çıkarabilirsiniz." /></label><textarea className="inp" style={{minHeight:50}} value={checks} onChange={e=>setChecks(e.target.value)} /></div>
+                    <div><label className="lbl">Ekstra Notlar</label><textarea className="inp" style={{minHeight:50}} value={notes} onChange={e=>setNotes(e.target.value)} /></div>
+                  </>
+                )}
+                <div className="grid-2" style={{marginTop:10}}>
+                  <button className="btn btn-ghost" style={{justifyContent:"center"}} onClick={()=>setIsEdit(false)}>İptal</button>
+                  <button className="btn btn-amber" style={{justifyContent:"center"}} onClick={handleSave}>💾 Değişiklikleri Kaydet</button>
+                </div>
+              </div>
+            )}
+          </React.Fragment>
+        </ErrorBoundary>
+      </div>
+    </div>
+  );
+};
+
+// --- TOPLU BAKIM GİRİŞ MODALI ---
+const BulkMaintModal = ({ selectedMacs, data, onClose, sendData }) => {
+  const [tplKey, setTplKey] = useState("");
+  const [person, setPerson] = useState("");
+  const [notes, setNotes] = useState("");
+  const [formDate, setFormDate] = useState(toDTL(new Date()));
+  const [progress, setProgress] = useState(0);
+
+  const availableTpls = useMemo(() => {
+    if (!selectedMacs || selectedMacs.length === 0) return [];
+    let commonKeys = null;
+    const labels = {};
+
+    safeArr(selectedMacs).forEach(m => {
+      if(!m) return;
+      const c = safeArr(data.categories).find(x => x && x.id === m.catId);
+      const hasCustomTpl = m.templates && Object.keys(safeObj(m.templates)).length > 0;
+      const tpls = safeObj(hasCustomTpl ? m.templates : (c?.templates || {}));
+
+      const currentKeys = Object.keys(tpls);
+      currentKeys.forEach(k => { if(tpls[k]) labels[k] = tpls[k].label; });
+
+      if (commonKeys === null) {
+        commonKeys = currentKeys;
+      } else {
+        commonKeys = commonKeys.filter(k => currentKeys.includes(k)); 
+      }
+    });
+    return (commonKeys || []).map(k => [k, labels[k]]);
+  }, [selectedMacs, data.categories]);
+
+  const handleBulkSubmit = async () => {
+    if(!tplKey || !person) return alert("Şablon ve Yapan Kişi zorunludur!");
+    if(!formDate) return alert("HATA: Tarih ve saat alanı boş bırakılamaz!"); // YENİ: BOŞ TARİH KORUMASI
+    if (new Date(formDate) > new Date()) return alert("HATA: Gelecek bir tarih/saat seçemezsiniz!");
+
+    setProgress(1);
+    
+    for (let i = 0; i < selectedMacs.length; i++) {
+      const m = selectedMacs[i];
+      if(!m) continue;
+      const c = safeArr(data.categories).find(x => x && x.id === m.catId);
+      const hasCustomTpl = m.templates && Object.keys(safeObj(m.templates)).length > 0;
+      const tpls = safeObj(hasCustomTpl ? m.templates : (c?.templates || {}));
+      
+      const tpl = tpls[tplKey];
+      if (tpl) {
+        const allItems = safeArr(tpl?.items).join(", ");
+        await sendData("log_maint", { 
+           id: "MNT-"+uid(), machineId: m.id, maintType: tplKey, 
+           person: person, checks: allItems, notes: notes, customDate: formDate 
+        }, true);
+      }
+      setProgress(i + 2);
+    }
+    
+    alert("Toplu bakım başarıyla işlendi!");
+    onClose(); 
+  };
+
+  return (
+    <div className="overlay" style={{zIndex:4000}} onClick={()=>progress===0 && onClose()}>
+      <div className="card mbody" onClick={e=>e.stopPropagation()}>
+        <ErrorBoundary>
+          <React.Fragment>
+            <h3 style={{color:"var(--blue)", marginBottom:10}}>Toplu Otomatik Bakım Doldurma</h3>
+            <p style={{fontSize:12, color:"var(--dim)", marginBottom:15}}>{selectedMacs.length} adet makineye otomatik olarak tüm kontrolleri yapılmış (100%) şeklinde bakım işlenecektir.</p>
+            
+            {progress > 0 ? (
+               <div style={{textAlign:"center", padding:30}}>
+                  <div className="spinner" style={{margin:"0 auto 15px auto"}}></div>
+                  <div style={{fontWeight:800}}>Kaydediliyor... Lütfen Bekleyin.</div>
+                  <div style={{color:"var(--blue)", marginTop:10}}>{progress - 1} / {selectedMacs.length} İşlendi</div>
+               </div>
+            ) : (
+              <div style={{display:"flex", flexDirection:"column", gap:12}}>
+                {availableTpls.length === 0 && <div style={{color:"var(--red)", fontSize:12, padding:10, background:"rgba(239,68,68,0.1)", borderRadius:8}}>⚠️ Seçtiğiniz makinelerin tümünde ortak bulunan bir bakım şablonu yok. Lütfen seçimlerinizi gözden geçirin.</div>}
+                
+                <div><label className="lbl">Uygulanacak Tarih / Saat <InfoBtn msg="Bakımın yapıldığı tarih. Tüm seçili makinelere bu tarih işlenir." /></label><input type="datetime-local" className="inp" value={formDate} onChange={e=>setFormDate(e.target.value)} /></div>
+                <div><label className="lbl">Uygulanacak Bakım Şablonu * <InfoBtn msg="Seçili makinelerin TÜMÜNDE ortak olan bakım şablonları listelenir." /></label>
+                  <select className="inp" value={tplKey} onChange={e=>setTplKey(e.target.value)}>
+                    <option value="">-- Şablon Seçin --</option>
+                    {availableTpls.map(([k, label]) => <option key={k} value={k}>{label} ({k})</option>)}
+                  </select>
+                </div>
+                <div><label className="lbl">Bakımı Yapan Kişi *</label><input className="inp" value={person} onChange={e=>setPerson(e.target.value)} /></div>
+                <div><label className="lbl">Ortak Not (Opsiyonel)</label><textarea className="inp" style={{minHeight:50}} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Tüm makineler için genel bir not..."/></div>
+                
+                <div className="grid-2" style={{marginTop:10}}>
+                  <button className="btn btn-ghost" style={{justifyContent:"center"}} onClick={()=>onClose()}>İptal</button>
+                  <button className="btn btn-blue" style={{justifyContent:"center"}} onClick={handleBulkSubmit} disabled={availableTpls.length === 0}>⚡ Otomatik Doldur</button>
+                </div>
+              </div>
+            )}
+          </React.Fragment>
+        </ErrorBoundary>
+      </div>
+    </div>
+  );
+};
+
+
+// --- ŞABLON VE KATEGORİ YÖNETİMİ ---
+const CategoryManagerModal = ({ cat, onClose, sendData, data }) => {
+  const isEdit = !!cat;
+  const [tab, setTab] = useState("info");
+  const [name, setName] = useState(cat ? cat.name : "");
+  const [reasons, setReasons] = useState(cat && cat.reasons ? cat.reasons.join(", ") : "");
+  const [templates, setTemplates] = useState(cat ? safeObj(cat.templates) : {});
+  
+  const [tplKey, setTplKey] = useState("");
+  const [tplLabel, setTplLabel] = useState("");
+  const [tplDays, setTplDays] = useState("");
+  const [tplItems, setTplItems] = useState("");
+  const [confirmDel, setConfirmDel] = useState(false);
+
+  const handleSaveCat = async () => {
+    if(!name) return alert("Kategori adı zorunlu!");
+    const rArr = reasons.split(',').map(s=>s.trim()).filter(Boolean);
+    const payload = { id: isEdit ? cat.id : "CAT-"+uid(), name, reasons: JSON.stringify(rArr), templates: JSON.stringify(templates) };
+    const success = await sendData(isEdit ? "update_category" : "add_category", payload);
+    if(success) onClose();
+  };
+
+  const handleDeleteCat = async () => {
+    const hasMachines = safeArr(data.machines).some(m => m && m.catId === cat.id);
+    if(hasMachines) return alert("Bu kategoriye bağlı makineler var! Önce makineleri silmelisiniz.");
+    const success = await sendData("delete_category", { id: cat.id });
+    if(success) onClose();
+  };
+
+  const addTemplate = () => {
+    if(!tplKey || !tplLabel || !tplDays) return alert("Şablon Kodu, Adı ve Periyodu zorunlu!");
+    const itemsArr = tplItems.split('\n').map(s=>s.trim()).filter(Boolean);
+    setTemplates({ ...templates, [tplKey]: { label: tplLabel, periodDays: parseInt(tplDays), items: itemsArr } });
+    setTplKey(""); setTplLabel(""); setTplDays(""); setTplItems("");
+  };
+
+  const editTemplate = (k, v) => { setTplKey(k); setTplLabel(v.label); setTplDays(v.periodDays); setTplItems(v.items?v.items.join('\n'):""); };
+  const delTemplate = (k) => { const newTpls = {...templates}; delete newTpls[k]; setTemplates(newTpls); };
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="card mbody" onClick={e=>e.stopPropagation()}>
+        <ErrorBoundary>
+          <React.Fragment>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+              <h3 style={{color:"var(--purple)"}}>{isEdit ? "Kategori Düzenle" : "Yeni Kategori Ekle"}</h3>
+              <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+            </div>
+            <div className="tabs">
+              <div className={`tab ${tab==="info"?"active":""}`} onClick={()=>setTab("info")}>Temel Bilgiler</div>
+              <div className={`tab ${tab==="tpl"?"active":""}`} onClick={()=>setTab("tpl")}>Varsayılan Şablonlar</div>
+            </div>
+
+            {tab === "info" && (
+              <div style={{display:"flex", flexDirection:"column", gap:12}}>
+                <div><label className="lbl">Kategori Adı * <InfoBtn msg="Makine grubunun genel adı (Örn: Presler, Torna)." /></label><input className="inp" placeholder="Örn: Presler" value={name} onChange={e=>setName(e.target.value)} /></div>
+                <div><label className="lbl">Operasyonel Duruş Sebepleri (Virgülle ayırın) <InfoBtn msg="Bu gruptaki makinelerin arıza dışında durmasına sebep olan genel üretim sorunları (Örn: Tel Bitti, Kalıp Ayarı)." /></label><textarea className="inp" placeholder="Örn: Tel Bitti, Kalıp Ayarı" value={reasons} onChange={e=>setReasons(e.target.value)} /></div>
+                <div className="grid-2" style={{marginTop:10}}>
+                  <button className="btn btn-purple" style={{justifyContent:"center"}} onClick={handleSaveCat}>💾 Kaydet</button>
+                  {isEdit && <button className="btn btn-dng" style={{justifyContent:"center"}} onClick={()=>setConfirmDel(true)}>🗑 Kategoriyi Sil</button>}
+                </div>
+              </div>
+            )}
+
+            {tab === "tpl" && (
+              <div style={{display:"flex", flexDirection:"column", gap:16}}>
+                <div style={{background:"var(--inp)", padding:12, borderRadius:8, border:"1px solid var(--border)"}}>
+                  <h4 style={{fontSize:12, color:"var(--dim)", marginBottom:10}}>ŞABLON DÜZENLEYİCİ</h4>
+                  <div className="grid-3" style={{marginBottom:10}}>
+                    <div><label className="lbl">Sistem Kodu <InfoBtn msg="Şablonun veritabanındaki benzersiz kısa adı (Örn: gunluk). Sadece harf kullanın." /></label><input className="inp" placeholder="gunluk" value={tplKey} onChange={e=>setTplKey(e.target.value.toLowerCase().replace(/[^a-z0-9]/g,''))}/></div>
+                    <div><label className="lbl">Görünür Ad <InfoBtn msg="Kullanıcıların ekranda göreceği bakım adı (Örn: Günlük Bakım)." /></label><input className="inp" placeholder="Günlük Bakım" value={tplLabel} onChange={e=>setTplLabel(e.target.value)}/></div>
+                    <div><label className="lbl">Periyot (Gün) <InfoBtn msg="Bu bakımın kaç günde bir tekrarlanması gerektiği (Örn: 7)." /></label><input className="inp" type="number" placeholder="1" value={tplDays} onChange={e=>setTplDays(e.target.value)}/></div>
+                  </div>
+                  <div><label className="lbl">Kontrol Maddeleri (Her satıra bir madde) <InfoBtn msg="Bakım yapılırken kontrol edilecek adımlar. Her satıra bir madde yazın." /></label><textarea className="inp" placeholder="Yağ seviyesi&#10;Şalter kontrolü" value={tplItems} onChange={e=>setTplItems(e.target.value)} style={{minHeight:80}}/></div>
+                  <button className="btn btn-ghost btn-sm" style={{width:"100%", marginTop:10, justifyContent:"center"}} onClick={addTemplate}>Aşağıdaki Listeye Ekle / Güncelle</button>
+                </div>
+                <div>
+                  {Object.entries(templates).map(([k, v]) => {
+                    if(!v || typeof v !== 'object') return null;
+                    return (
+                    <div key={k} style={{display:"flex", justifyContent:"space-between", alignItems:"center", background:"var(--bg)", padding:10, borderRadius:8, border:"1px solid var(--border)", marginBottom:6}}>
+                      <div>
+                        <div style={{fontWeight:700, color:"var(--blue)"}}>{safeStr(v.label)} <span className="badge" style={{background:"var(--inp)", color:"var(--dim)", marginLeft:6}}>{Number(v.periodDays)||0} GÜN</span></div>
+                        <div style={{fontSize:11, color:"var(--mute)", marginTop:4}}>{safeArr(v.items).length} Madde</div>
+                      </div>
+                      <div style={{display:"flex", gap:4}}>
+                        <button className="btn btn-ghost btn-xs" onClick={()=>editTemplate(k,v)}>Düzenle</button>
+                        <button className="btn btn-dng btn-xs" onClick={()=>delTemplate(k)}>Sil</button>
+                      </div>
+                    </div>
+                  )})}
+                </div>
+                <button className="btn btn-purple" style={{justifyContent:"center"}} onClick={handleSaveCat}>💾 Kategori Verilerini Kaydet</button>
+              </div>
+            )}
+            {confirmDel && <ConfirmModal msg={`${name} kategorisini silmek istediğinize emin misiniz?`} onYes={handleDeleteCat} onNo={()=>setConfirmDel(false)} />}
+          </React.Fragment>
+        </ErrorBoundary>
+      </div>
+    </div>
+  );
+};
+
+// --- MAKİNE YÖNETİMİ ---
+const MachineManagerModal = ({ mac, categories, onClose, sendData }) => {
+  const isEdit = !!mac;
+  const [tab, setTab] = useState("info");
+  const [catId, setCatId] = useState(mac ? mac.catId : "");
+  const [form, setForm] = useState(mac ? {name:mac.name, brand:mac.brand, model:mac.model, status:mac.status} : {name:"", brand:"", model:"", status:"active"});
+  const [customTemplates, setCustomTemplates] = useState(mac && mac.templates ? safeObj(mac.templates) : {});
+  
+  const [tplKey, setTplKey] = useState("");
+  const [tplLabel, setTplLabel] = useState("");
+  const [tplDays, setTplDays] = useState("");
+  const [tplItems, setTplItems] = useState("");
+  const [confirmDel, setConfirmDel] = useState(false);
+
+  const handleSave = async () => {
+    if(!catId || !form.name) return alert("Kategori ve Ad zorunludur!");
+    const payload = { id: isEdit ? mac.id : "MAC-"+uid(), categoryId: catId, name: form.name, brand: form.brand, model: form.model, status: form.status, templates: JSON.stringify(customTemplates) };
+    const success = await sendData(isEdit ? "update_machine" : "add_machine", payload);
+    if(success) onClose();
+  };
+
+  const handleDelete = async () => {
+    const success = await sendData("delete_machine", { id: mac.id });
+    if(success) onClose();
+  };
+
+  const addTemplate = () => {
+    if(!tplKey || !tplLabel || !tplDays) return alert("Eksik bilgi!");
+    const itemsArr = tplItems.split('\n').map(s=>s.trim()).filter(Boolean);
+    setCustomTemplates({ ...customTemplates, [tplKey]: { label: tplLabel, periodDays: parseInt(tplDays), items: itemsArr } });
+    setTplKey(""); setTplLabel(""); setTplDays(""); setTplItems("");
+  };
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="card mbody" onClick={e=>e.stopPropagation()}>
+        <ErrorBoundary>
+          <React.Fragment>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+              <h3 style={{color:"var(--blue)"}}>{isEdit ? "Makine Düzenle" : "Yeni Makine Ekle"}</h3>
+              <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+            </div>
+            <div className="tabs">
+              <div className={`tab ${tab==="info"?"active":""}`} onClick={()=>setTab("info")}>Makine Bilgileri</div>
+              <div className={`tab ${tab==="tpl"?"active":""}`} onClick={()=>setTab("tpl")}>Özel Bakım Şablonu</div>
+            </div>
+
+            {tab === "info" && (
+              <div style={{display:"flex", flexDirection:"column", gap:10}}>
+                <label className="lbl">Kategori <InfoBtn msg="Makinenin ait olduğu ana grup." /></label>
+                <select className="inp" value={catId} onChange={e=>setCatId(e.target.value)}>
+                  <option value="">-- Seçiniz --</option>
+                  {safeArr(categories).map(c => c && <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                <label className="lbl">Makine Kodu / Adı * <InfoBtn msg="Makinenin tesis içindeki benzersiz numarası veya adı." /></label>
+                <input className="inp" placeholder="Örn: Torna 1" value={form.name} onChange={e=>setForm({...form, name: e.target.value})} />
+                <div className="grid-2">
+                  <div><label className="lbl">Marka</label><input className="inp" value={form.brand} onChange={e=>setForm({...form, brand: e.target.value})} /></div>
+                  <div><label className="lbl">Model</label><input className="inp" value={form.model} onChange={e=>setForm({...form, model: e.target.value})} /></div>
+                </div>
+                {isEdit && (
+                  <div><label className="lbl">Manuel Durum Değişimi <InfoBtn msg="Makinenin durumunu el ile değiştirmek isterseniz kullanın." /></label>
+                    <select className="inp" value={form.status} onChange={e=>setForm({...form, status:e.target.value})}>
+                      <option value="active">Çalışıyor (Active)</option>
+                      <option value="stopped">Duruşta (Stopped)</option>
+                      <option value="fault">Arızalı (Fault)</option>
+                    </select>
+                  </div>
+                )}
+                <div className="grid-2" style={{marginTop:10}}>
+                  <button className="btn btn-blue" style={{justifyContent:"center"}} onClick={handleSave}>💾 Kaydet</button>
+                  {isEdit && <button className="btn btn-dng" style={{justifyContent:"center"}} onClick={()=>setConfirmDel(true)}>🗑 Makineyi Sil</button>}
+                </div>
+              </div>
+            )}
+
+            {tab === "tpl" && (
+              <div style={{display:"flex", flexDirection:"column", gap:16}}>
+                <div style={{padding:10, background:"rgba(59, 130, 246, 0.1)", borderRadius:8, fontSize:12, color:"var(--text)"}}>
+                  ℹ️ <b>Atölye Mantığı:</b> Bu makineye <InfoBtn msg="Atölye gibi her makinesi farklı olan alanlarda, kategori şablonu yerine sadece bu makineye özel bakım atamak için kullanılır." /> özel şablon eklerseniz, kategori şablonları bu makine için <b>yok sayılır</b>.
+                </div>
+                <div style={{background:"var(--inp)", padding:12, borderRadius:8, border:"1px solid var(--border)"}}>
+                  <div className="grid-3" style={{marginBottom:10}}>
+                    <div><label className="lbl">Kod</label><input className="inp" placeholder="aylik" value={tplKey} onChange={e=>setTplKey(e.target.value.toLowerCase().replace(/[^a-z0-9]/g,''))}/></div>
+                    <div><label className="lbl">Ad</label><input className="inp" placeholder="Aylık Bakım" value={tplLabel} onChange={e=>setTplLabel(e.target.value)}/></div>
+                    <div><label className="lbl">Gün</label><input className="inp" type="number" value={tplDays} onChange={e=>setTplDays(e.target.value)}/></div>
+                  </div>
+                  <div><label className="lbl">Maddeler (Alt alta)</label><textarea className="inp" value={tplItems} onChange={e=>setTplItems(e.target.value)} style={{minHeight:60}}/></div>
+                  <button className="btn btn-ghost btn-sm" style={{width:"100%", marginTop:10, justifyContent:"center"}} onClick={addTemplate}>Ekle / Güncelle</button>
+                </div>
+                <div>
+                  {Object.entries(customTemplates).map(([k, v]) => {
+                    if(!v || typeof v !== 'object') return null;
+                    return(
+                    <div key={k} style={{display:"flex", justifyContent:"space-between", alignItems:"center", background:"var(--bg)", padding:10, borderRadius:8, border:"1px solid var(--border)", marginBottom:6}}>
+                      <div style={{fontWeight:700}}>{safeStr(v.label)} ({Number(v.periodDays)||0} Gün)</div>
+                      <div style={{display:"flex", gap:4}}>
+                        <button className="btn btn-ghost btn-xs" onClick={()=>{setTplKey(k); setTplLabel(v.label); setTplDays(v.periodDays); setTplItems(v.items?v.items.join('\n'):"");}}>Düzenle</button>
+                        <button className="btn btn-dng btn-xs" onClick={()=>{const nt={...customTemplates}; delete nt[k]; setCustomTemplates(nt);}}>Sil</button>
+                      </div>
+                    </div>
+                  )})}
+                </div>
+                <button className="btn btn-blue" style={{justifyContent:"center"}} onClick={handleSave}>💾 Makineyi Kaydet</button>
+              </div>
+            )}
+            {confirmDel && <ConfirmModal msg={`${form.name} silinecek. Emin misiniz?`} onYes={handleDelete} onNo={()=>setConfirmDel(false)} />}
+          </React.Fragment>
+        </ErrorBoundary>
+      </div>
+    </div>
+  );
+};
+
+// --- MÜDAHALE (KAPATMA) MODALI ---
+const RepairModal = ({ repTgt, onClose, sendData }) => {
+  const [by, setBy] = useState("");
+  const [note, setNote] = useState("");
+  const [parts, setParts] = useState("");
+  const [formDate, setFormDate] = useState(toDTL(new Date()));
+  const [isSubmitting, setIsSubmitting] = useState(false); // YENİ: Buton kilidi
+
+  const handle = async () => {
+    if(!by || !note) return alert("İsim ve işlem zorunludur!");
+    if(!formDate) return alert("HATA: Tarih ve saat alanı boş bırakılamaz!"); // YENİ EKLENDİ
+    
+    const endDt = new Date(formDate);
+    if (endDt > new Date()) return alert("HATA: Henüz yaşanmamış ileri bir tarih veya saat seçemezsiniz!");
+
+    let startStr = safeStr(repTgt?.start);
+    if(startStr.includes(" ")) startStr = startStr.replace(" ", "T");
+    const startDt = new Date(startStr);
+    
+    if (endDt < startDt) return alert("HATA: Arızayı kapatma zamanı, arızanın başladığı zamandan (" + fd(repTgt?.start) + ") daha eski olamaz!");
+
+    setIsSubmitting(true); // YENİ: Kayıt başladı, kilitle
+    const calculatedDowntime = calcShiftDowntime(startStr, formDate, GLOBAL_SHIFT_START, GLOBAL_SHIFT_END);
+
+    const success = await sendData("close_fault", { 
+      id: repTgt.id, 
+      closedBy: by, 
+      closedDesc: note, 
+      materials: parts, 
+      customDate: formDate, 
+      downtime: calculatedDowntime 
+    });
+    setIsSubmitting(false); // YENİ: Kayıt bitti, kilidi aç
+    if(success) onClose();
+  };
+  return (
+    <div className="overlay" onClick={onClose} style={{zIndex:3000}}>
+      <div className="card mbody" onClick={e=>e.stopPropagation()}>
+        <ErrorBoundary>
+          <React.Fragment>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:15}}>
+              <h3 style={{color:"var(--green)"}}>Müdahale & Duruş Sonlandırma</h3>
+              <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+            </div>
+            <div style={{background:"var(--inp)", padding:12, borderRadius:8, marginBottom:15, border:"1px solid var(--border)"}}>
+              <strong style={{color:"var(--amber)", fontSize:14}}>[{safeStr(repTgt?.reason)}]</strong>
+              <p style={{fontSize:13, marginTop:6, color:"var(--text)"}}>{safeStr(repTgt?.desc)}</p>
+              <div style={{fontSize:11, color:"var(--dim)", marginTop:8}}>Başlangıç: {fd(repTgt?.start)}</div>
+            </div>
+            <div style={{display:"flex", flexDirection:"column", gap:12}}>
+              <div><label className="lbl">Müdahale Eden * <InfoBtn msg="Arızayı gideren teknik personelin adı." /></label><input className="inp" value={by} onChange={e=>setBy(e.target.value)} placeholder="Ad Soyad"/></div>
+              <div><label className="lbl">Kapatma Tarihi / Saati <InfoBtn msg="Duruşun fiilen bittiği zaman. Duruş süresi girilen MESAİ SAATLERİNE göre net hesaplanır." /></label><input type="datetime-local" className="inp" value={formDate} onChange={e=>setFormDate(e.target.value)} /></div>
+              <div><label className="lbl">Yapılan İşlem * <InfoBtn msg="Arızayı çözmek için yapılan teknik müdahalenin detayı." /></label><textarea className="inp" value={note} onChange={e=>setNote(e.target.value)}/></div>
+              <div><label className="lbl">Yedek Parça / Malzeme <InfoBtn msg="Kullanılan parçaları virgülle ayırarak yazın (Parça sicili için önemlidir)." /></label><textarea className="inp" style={{minHeight:50}} value={parts} onChange={e=>setParts(e.target.value)} placeholder="1 adet sensör vb."/></div>
+              <button className="btn btn-green" style={{justifyContent:"center", padding:14, opacity: isSubmitting ? 0.7 : 1}} onClick={handle} disabled={isSubmitting}>
+                {isSubmitting ? "⏳ KAYDEDİLİYOR..." : "✅ İşlemi Bitir & Devreye Al"}
+              </button>
+            </div>
+          </React.Fragment>
+        </ErrorBoundary>
+      </div>
+    </div>
+  );
+};
+
+// --- MAKİNE DETAY & ANALİZ MODALI ---
+const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw }) => {
+  const [tab, setTab] = useState("summary"); 
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [selRecord, setSelRecord] = useState(null);
+
+  const filteredFaults = useMemo(() => {
+    return safeArr(data.faults).filter(f => {
+      if(!f || f.macId !== mac?.id) return false;
+      const d = f.start ? toYMD(f.start) : ""; 
+      if(startDate && d && d < startDate) return false;
+      if(endDate && d && d > endDate) return false;
+      return true;
+    }).sort((a,b) => safeTime(b.start) - safeTime(a.start)); 
+  }, [mac?.id, data.faults, startDate, endDate]);
+
+  const filteredMaint = useMemo(() => {
+    return safeArr(data.maintenance).filter(m => {
+      if(!m || m.macId !== mac?.id) return false;
+      const d = m.date ? toYMD(m.date) : ""; 
+      if(startDate && d && d < startDate) return false;
+      if(endDate && d && d > endDate) return false;
+      return true;
+    }).sort((a,b) => safeTime(b.date) - safeTime(a.date)); 
+  }, [mac?.id, data.maintenance, startDate, endDate]);
+
+  const filteredStats = useMemo(() => {
+    let downTotal = 0, faultCount = 0, opCount = 0, faultMins = 0;
+    let faultDates = [];
+    filteredFaults.forEach(f => {
+      if(f.status === "closed" && f.type !== "bakim") {
+        const d = (Number(f.downtime) || 0);
+        downTotal += d;
+        if(f.type === "ariza") { 
+           faultCount++; 
+           faultMins += d;
+           if(f.start) faultDates.push(safeTime(f.start)); 
+        } else {
+           opCount++;
+        }
+      }
+    });
+    const mttr = faultCount > 0 ? Math.round(faultMins / faultCount) : 0; 
+    let mtbf = "Veri Yok";
+    if (faultDates.length > 1) {
+      faultDates.sort((a,b) => a - b);
+      let totalDiff = 0;
+      for(let i=1; i<faultDates.length; i++) totalDiff += (faultDates[i] - faultDates[i-1]);
+      mtbf = ((totalDiff / (faultDates.length - 1)) / 86400000).toFixed(1) + " Gün";
+    }
+    return { downTotal, faultCount, opCount, mttr, mtbf };
+  }, [filteredFaults]);
+
+  const basicStats = useMemo(() => {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).getTime();
+    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).getTime();
+    
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0).getTime();
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).getTime();
+
+    let downToday = 0, downMonth = 0, downTotal = 0;
+
+    safeArr(data.faults).forEach(f => {
+      if(f && f.macId === mac?.id && f.type !== "bakim") {
+        let fStart = safeTime(f.start);
+        let fEnd = (f.status === "closed" && f.end) ? safeTime(f.end) : now.getTime();
+        
+        if (fStart > 0 && fEnd > fStart) {
+           downTotal += f.status === "closed" ? (Number(f.downtime) || 0) : calcShiftDowntime(fStart, fEnd, GLOBAL_SHIFT_START, GLOBAL_SHIFT_END);
+           
+           const overlapTodayStart = Math.max(fStart, todayStart);
+           const overlapTodayEnd = Math.min(fEnd, todayEnd);
+           if (overlapTodayEnd > overlapTodayStart) {
+             downToday += calcShiftDowntime(overlapTodayStart, overlapTodayEnd, GLOBAL_SHIFT_START, GLOBAL_SHIFT_END);
+           }
+
+           const overlapMonthStart = Math.max(fStart, monthStart);
+           const overlapMonthEnd = Math.min(fEnd, monthEnd);
+           if (overlapMonthEnd > overlapMonthStart) {
+             downMonth += calcShiftDowntime(overlapMonthStart, overlapMonthEnd, GLOBAL_SHIFT_START, GLOBAL_SHIFT_END);
+           }
+        }
+      }
+    });
+
+    return { downToday: Math.round(downToday), downMonth: Math.round(downMonth), downTotal: Math.round(downTotal) };
+  }, [mac?.id, data.faults]);
+
+  const trackers = useMemo(() => {
+    const hasCustomTpl = mac?.templates && Object.keys(safeObj(mac.templates)).length > 0;
+    const tpls = safeObj(hasCustomTpl ? mac.templates : (cat?.templates || {}));
+    const results = [];
+    const todayMs = Date.now();
+
+    Object.entries(tpls).forEach(([key, tpl]) => {
+      if(!tpl || typeof tpl !== 'object') return; 
+      const pastMaint = safeArr(data.maintenance).filter(m => m && m.macId === mac?.id && m.type === key).sort((a,b) => safeTime(b.date) - safeTime(a.date));
+      const last = pastMaint[0];
+      let nextDateMs = null, diffDays = null, isOverdue = false, statusText = "Yapılmadı", progress = 0;
+
+      if(last && last.date) {
+        const lastDate = new Date(last.date);
+        if (!isNaN(lastDate.getTime())) {
+          const pDays = Number(tpl.periodDays) || 0; 
+          nextDateMs = lastDate.getTime() + (pDays * 86400000);
+          diffDays = Math.ceil((nextDateMs - todayMs) / 86400000);
+          isOverdue = diffDays < 0;
+          if(isOverdue) { statusText = `${Math.abs(diffDays)} GÜN GECİKTİ!`; progress = 100; } 
+          else { statusText = `${diffDays} gün kaldı`; progress = (pDays > 0) ? Math.min(100, Math.max(0, ((pDays - diffDays) / pDays) * 100)) : 100; }
+        }
+      }
+      results.push({ key, label: safeStr(tpl.label), period: Number(tpl.periodDays)||0, last, nextDateMs, diffDays, isOverdue, statusText, progress });
+    });
+    return results.sort((a,b) => (a.diffDays === null ? -999 : a.diffDays) - (b.diffDays === null ? -999 : b.diffDays));
+  }, [mac, cat, data.maintenance]);
+
+  const topParts = useMemo(() => {
+    const partsHistory = filteredFaults.filter(f => f && f.materials && f.materials.trim() !== "");
+    const counts = {};
+    partsHistory.forEach(f => {
+      const arr = f.materials.split(',').map(p=>p.trim()).filter(Boolean);
+      arr.forEach(p => {
+        const key = p.toLowerCase();
+        if(!counts[key]) counts[key] = { name: p, count: 0, ref: f };
+        counts[key].count++;
+      });
+    });
+    return Object.values(counts).sort((a,b) => b.count - a.count);
+  }, [filteredFaults]);
+
+  return (
+    <div className="overlay" onClick={onClose} style={{zIndex:2000}}>
+      <div className="card mbody" onClick={e=>e.stopPropagation()} style={{maxWidth:750}}>
+        <ErrorBoundary>
+          <React.Fragment>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", borderBottom:"1px solid var(--border)", paddingBottom:15}}>
+              <div>
+                <div style={{display:"flex", alignItems:"center", gap:8}}><h2 style={{fontSize:22, fontWeight:900}}>{safeStr(mac?.name)}</h2><span className="badge" style={{background: mac?.status==="active"?"#10b98120":mac?.status==="fault"?"#ef444420":"#f59e0b20", color: mac?.status==="active"?"var(--green)":mac?.status==="fault"?"var(--red)":"var(--amber)"}}>{mac?.status === "active" ? "✓ ÇALIŞIYOR" : mac?.status === "fault" ? "🔴 ARIZALI" : "🟠 DURDU"}</span></div>
+                <div style={{fontSize:13, color:"var(--dim)", marginTop:4}}>{safeStr(cat?.name)} • {safeStr(mac?.brand)} {safeStr(mac?.model)}</div>
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+            </div>
+
+            <div className="filters" style={{marginBottom:0, marginTop:10}}>
+              <span style={{fontSize:11, color:"var(--mute)", fontWeight:700}}>📅 TARİH FİLTRESİ (Tüm sekmeleri etkiler):</span>
+              <input type="date" className="inp" style={{width:"auto", padding:"6px"}} value={startDate} onChange={e=>setStartDate(e.target.value)} />
+              <span style={{color:"var(--dim)"}}>-</span>
+              <input type="date" className="inp" style={{width:"auto", padding:"6px"}} value={endDate} onChange={e=>setEndDate(e.target.value)} />
+              {(startDate || endDate) && <button className="btn btn-ghost btn-sm" onClick={()=>{setStartDate(""); setEndDate("");}}>Sıfırla</button>}
+            </div>
+
+            <div className="tabs" style={{marginTop:16}}>
+              <div className={`tab ${tab==="summary"?"active":""}`} onClick={()=>setTab("summary")}>📊 Performans</div>
+              <div className={`tab ${tab==="calendar"?"active":""}`} onClick={()=>setTab("calendar")}>📅 Takvim</div>
+              <div className={`tab ${tab==="history"?"active":""}`} onClick={()=>setTab("history")}>📜 Geçmiş</div>
+              <div className={`tab ${tab==="parts"?"active":""}`} onClick={()=>setTab("parts")}>🛠 Parça Sicili</div>
+            </div>
+
+            {tab === "summary" && (
+              <div style={{display:"flex", flexDirection:"column", gap:16}}>
+                <div className="lbl" style={{color:"var(--mute)", marginTop:10}}>TÜM ZAMANLAR (Filtresiz) - Mesai: {GLOBAL_SHIFT_START} / {GLOBAL_SHIFT_END}</div>
+                <div className="grid-3">
+                  <div className="card" style={{padding:12, textAlign:"center", background:"var(--inp)"}}>
+                    <div className="lbl" style={{justifyContent:"center"}}>BUGÜN NET DURUŞ <InfoBtn msg="Bugün içinde makinenin duruşta geçirdiği net dakika. Gece ve haftasonu sayılmaz." /></div>
+                    <div style={{fontSize:20, fontWeight:900, color:basicStats.downToday>0?"var(--amber)":"var(--green)"}}>
+                      {basicStats.downToday} <span style={{fontSize:11}}>dk</span>
+                    </div>
+                    {basicStats.downToday >= 60 && <div style={{fontSize:10, color:"var(--dim)", marginTop:2}}>~ {(basicStats.downToday/60).toFixed(1)} Saat</div>}
+                  </div>
+                  
+                  <div className="card" style={{padding:12, textAlign:"center", background:"var(--inp)"}}>
+                    <div className="lbl" style={{justifyContent:"center"}}>BU AY NET DURUŞ <InfoBtn msg="İçinde bulunduğumuz ay boyunca makinenin geçirdiği net duruş süresi." /></div>
+                    <div style={{fontSize:20, fontWeight:900, color:basicStats.downMonth>0?"var(--red)":"var(--text)"}}>
+                      {basicStats.downMonth} <span style={{fontSize:11}}>dk</span>
+                    </div>
+                    {basicStats.downMonth >= 60 && <div style={{fontSize:10, color:"var(--dim)", marginTop:2}}>~ {(basicStats.downMonth/60).toFixed(1)} Saat</div>}
+                  </div>
+                  
+                  <div className="card" style={{padding:12, textAlign:"center", background:"var(--inp)"}}>
+                    <div className="lbl" style={{justifyContent:"center"}}>TOPLAM DURUŞ <InfoBtn msg="Sistem kurulduğundan beri kaydedilen tüm duruş sürelerinin toplamı." /></div>
+                    <div style={{fontSize:20, fontWeight:900, color:"var(--dim)"}}>
+                      {basicStats.downTotal} <span style={{fontSize:11}}>dk</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="lbl" style={{color:"var(--blue)", borderTop:"1px solid var(--border)", paddingTop:16}}>{(startDate||endDate) ? "SEÇİLİ TARİH ARALIĞI" : "GENEL ANALİZ & KPI (Tüm Zamanlar)"}</div>
+                <div className="grid-4">
+                  <div className="card" style={{padding:12, background:"var(--inp)", borderLeft:"3px solid var(--red)"}}>
+                    <div className="lbl">ARIZA <InfoBtn msg="Seçili tarihlerdeki toplam mekanik/elektrik bozulma sayısı." /></div>
+                    <div style={{fontSize:18, fontWeight:800, marginTop:4, color:"var(--red)"}}>{filteredStats.faultCount} Kez</div>
+                  </div>
+                  <div className="card" style={{padding:12, background:"var(--inp)", borderLeft:"3px solid var(--amber)"}}>
+                    <div className="lbl">OPERASYONEL <InfoBtn msg="Seçili tarihlerdeki malzeme bekleme, kalıp ayarı gibi üretim duruşları." /></div>
+                    <div style={{fontSize:18, fontWeight:800, marginTop:4, color:"var(--amber)"}}>{filteredStats.opCount} Kez</div>
+                  </div>
+                  <div className="card" style={{padding:12, background:"var(--inp)", borderLeft:"3px solid var(--blue)"}}>
+                    <div className="lbl">MTTR (TAMİR) <InfoBtn msg="Ortalama Tamir Süresi: Sadece ARIZA kayıtlarının bildirilmesiyle kapatılması arasında geçen ortalama dakika." /></div>
+                    <div style={{fontSize:18, fontWeight:800, marginTop:4, color:"var(--blue)"}}>{filteredStats.mttr} dk</div>
+                  </div>
+                  <div className="card" style={{padding:12, background:"var(--inp)", borderLeft:"3px solid var(--green)"}}>
+                    <div className="lbl">MTBF (ARALIK) <InfoBtn msg="Arızalar Arası Ortalama Süre: Makinenin ortalama kaç günde bir bozulduğunu gösterir." /></div>
+                    <div style={{fontSize:16, fontWeight:800, marginTop:4, color:"var(--green)"}}>{filteredStats.mtbf}</div>
+                  </div>
+                </div>
+                <div className="card" style={{background:"rgba(239, 68, 68, 0.05)", border:"1px solid rgba(239, 68, 68, 0.2)", display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                  <div style={{fontWeight:700, color:"var(--text)"}}>Filtrelenen Dönem Toplam Duruş Süresi:</div>
+                  <div style={{fontWeight:900, color:"var(--red)", fontSize:20}}>{filteredStats.downTotal} dk</div>
+                </div>
+              </div>
+            )}
+
+            {tab === "calendar" && (
+              <div style={{display:"flex", flexDirection:"column", gap:12}}>
+                {trackers.length === 0 && <div className="card" style={{textAlign:"center", color:"var(--dim)"}}>Şablon tanımlanmamış.</div>}
+                {trackers.map(t => (
+                  <div key={t.key} className="card" style={{borderLeft: `4px solid ${t.isOverdue?"var(--red)":t.progress>80?"var(--amber)":"var(--green)"}`}}>
+                    <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8}}>
+                      <div><div style={{fontWeight:800, fontSize:15}}>{t.label} <span style={{fontSize:11, color:"var(--mute)"}}>({t.period} GÜN)</span></div><div style={{fontSize:12, color:"var(--dim)", marginTop:2}}>Son: {t.last && t.last.date ? fd(t.last.date, true) : "Yok"}</div></div>
+                      <div style={{textAlign:"right"}}>
+                        <div style={{fontSize:14, fontWeight:800, color:t.isOverdue?"var(--red)":t.progress>80?"var(--amber)":"var(--green)"}}>{t.statusText}</div>
+                        {t.nextDateMs && !t.isOverdue && <div style={{fontSize:10, color:"var(--mute)"}}>Hedef: {fd(t.nextDateMs, true)}</div>}
+                      </div>
+                    </div>
+                    <div className="prog-container">
+                      <div className="prog-fill" style={{width: `${Number(t.progress)||0}%`, background: t.isOverdue?"var(--red)":t.progress>80?"var(--amber)":"var(--green)"}}></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {tab === "history" && (
+              <div style={{display:"flex", flexDirection:"column", gap:16}}>
+                <div>
+                  <div className="lbl" style={{color:"var(--red)"}}>Arıza & Duruş Listesi (Detay için tıkla) <InfoBtn msg="Makinenin geçmişte yaşadığı tüm arıza ve duruşların listesi. Tıklayarak rapor detayına ulaşabilirsiniz." /></div>
+                  <div style={{maxHeight:200, overflowY:"auto", border:"1px solid var(--border)", borderRadius:8, marginBottom:16}}>
+                    <table>
+                      <thead style={{background:"var(--inp)", position:"sticky", top:0}}><tr><th>Tip</th><th>Sebep</th><th>Tarih</th><th>Dk</th></tr></thead>
+                      <tbody>
+                        {filteredFaults.length === 0 && <tr><td colSpan="4" style={{textAlign:"center", color:"var(--dim)"}}>Kayıt yok</td></tr>}
+                        {filteredFaults.map(f => (
+                          <tr key={f.id} className="clickable-row" onClick={() => setSelRecord({type: "fault", data: f})}>
+                            <td>{f.type==="ariza"?"🔴":"🟠"}</td><td style={{fontWeight:600}}>{safeStr(f.reason)}</td><td>{fd(f.start, true)}</td><td style={{color:"var(--red)", fontWeight:700}}>{f.status==="closed" && f.type!=="bakim" ? safeStr(f.downtime) : "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="lbl" style={{color:"var(--green)"}}>Yapılan Bakımlar (Detay için tıkla) <InfoBtn msg="Makineye bugüne kadar uygulanan planlı bakımların listesi." /></div>
+                  <div style={{maxHeight:200, overflowY:"auto", border:"1px solid var(--border)", borderRadius:8}}>
+                    <table>
+                      <thead style={{background:"var(--inp)", position:"sticky", top:0}}><tr><th>Bakım Tipi</th><th>Yapan</th><th>Tarih</th><th style={{textAlign:"right"}}>Kontrol Oranı <InfoBtn msg="Şablondaki maddelerin yüzde kaçının işaretlendiğini gösterir."/></th></tr></thead>
+                      <tbody>
+                        {filteredMaint.length === 0 && <tr><td colSpan="4" style={{textAlign:"center", color:"var(--dim)"}}>Kayıt yok</td></tr>}
+                        {filteredMaint.map(m => {
+                          const hasCustomTpl = mac?.templates && Object.keys(safeObj(mac.templates)).length > 0;
+                          const tpls = safeObj(hasCustomTpl ? mac.templates : (cat?.templates || {}));
+                          const tpl = tpls[m.type];
+                          const tName = tpl && tpl.label ? tpl.label : m.type;
+                          
+                          const doneCount = m.checks ? safeStr(m.checks).split(',').length : 0;
+                          const totalCount = tpl && tpl.items ? safeArr(tpl.items).length : doneCount; 
+                          const isAllDone = totalCount > 0 && doneCount >= totalCount;
+                          
+                          return (
+                            <tr key={m.id} className="clickable-row" onClick={() => setSelRecord({type: "maint", data: m})}>
+                              <td style={{fontWeight:600, color:"var(--blue)"}}>{safeStr(tName)}</td>
+                              <td>{safeStr(m.by)}</td>
+                              <td>{fd(m.date, true)}</td>
+                              <td style={{textAlign:"right"}}>
+                                <span className="badge" style={{background: isAllDone ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)", color: isAllDone ? "var(--green)" : "var(--red)"}}>
+                                  {doneCount}/{totalCount} Madde
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {tab === "parts" && (
+              <div style={{display:"flex", flexDirection:"column", gap:16}}>
+                {topParts.length > 0 && (
+                  <div>
+                    <div className="lbl" style={{color:"var(--amber)"}}>EN ÇOK DEĞİŞEN / KULLANILANLAR (Filtreye Göre) <InfoBtn msg="Bu makinede en sık değiştirilen parçaların listesi." /></div>
+                    <div className="grid-3">
+                      {topParts.slice(0,6).map((p, i) => (
+                        <div key={i} className="card clickable-row" style={{background:"var(--inp)", textAlign:"center", padding:12}} onClick={() => setSelRecord({type: "fault", data: p.ref})} title="Bu parçanın takıldığı rapora gitmek için tıkla">
+                          <div style={{fontSize:16, fontWeight:800, color:"var(--text)"}}>{p.name}</div>
+                          <div style={{fontSize:12, color:"var(--amber)", marginTop:4}}>{p.count} Defa Yazıldı</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <div>
+                  <div className="lbl" style={{color:"var(--text)"}}>TÜM PARÇA DEĞİŞİM SİCİLİ (Detay için tıkla) <InfoBtn msg="Bu makinede değişen tüm yedek parçaların tarihsel dökümü." /></div>
+                  <div style={{maxHeight:300, overflowY:"auto", border:"1px solid var(--border)", borderRadius:8}}>
+                    <table>
+                      <thead style={{background:"var(--inp)", position:"sticky", top:0}}><tr><th>Değişen Parça / Malzeme Bilgisi</th><th>Tarih</th><th>Bakımcı</th></tr></thead>
+                      <tbody>
+                        {filteredFaults.filter(f => f.materials && f.materials.trim() !== "").length === 0 && <tr><td colSpan="3" style={{textAlign:"center", color:"var(--dim)"}}>Seçili dönemde parça kaydı yok.</td></tr>}
+                        {filteredFaults.filter(f => f.materials && f.materials.trim() !== "").map(f => (
+                          <tr key={f.id} className="clickable-row" onClick={() => setSelRecord({type: "fault", data: f})}>
+                            <td style={{fontWeight:700, color:"var(--amber)"}}>{f.materials}</td>
+                            <td style={{fontSize:12, color:"var(--dim)"}}>{fd(f.end)}</td>
+                            <td style={{fontSize:12}}>{f.closedBy}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selRecord && <RecordDetailModal record={selRecord.data} type={selRecord.type} macName={mac?.name} onClose={()=>setSelRecord(null)} sendData={sendData} checkPw={checkPw} />}
+          </React.Fragment>
+        </ErrorBoundary>
+      </div>
+    </div>
+  );
+};
+
+// --- QR KOD EKRANI ---
+const QRPage = ({ data, setPg }) => {
+  const [selCat, setSelCat] = useState(null);
+  return (
+    <div style={{padding:24, maxWidth:1100, margin:"0 auto"}}>
+      <ErrorBoundary>
+        <div style={{display:"flex", alignItems:"center", gap:12, marginBottom:24}}>
+          <button className="btn btn-ghost" style={{padding:"5px 12px"}} onClick={()=>selCat?setSelCat(null):setPg("dash")}>← {selCat?"Kategoriler":"Ana Panel"}</button>
+          <div><h2 style={{fontSize:22, fontWeight:800}}>Barkod & QR Yönetimi</h2><p style={{fontSize:13, color:"var(--dim)"}}>Kameradan okutunca otomatik form açılır.</p></div>
+        </div>
+        
+        {!selCat ? (
+          <div className="g-auto">
+            {safeArr(data.categories).map(c => {
+               if(!c) return null;
+               return <div key={c.id} className="card clickable-row" style={{textAlign:"center", padding:20, fontWeight:800, fontSize:18}} onClick={()=>setSelCat(c)}>{safeStr(c?.name)}</div>
+            })}
+          </div>
+        ) : (
+          <div className="g-auto">
+            {safeArr(data.machines).filter(m => m && m.catId === selCat?.id).map(m => {
+              const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + encodeURIComponent(window.location.href.split('?')[0] + "?mac=" + m.id);
+              return (
+                <div key={m.id} className="card" style={{textAlign:"center", padding:20}}>
+                  <img src={qrUrl} style={{borderRadius:8, border:'4px solid white', marginBottom:10}} width="130" height="130" alt="QR"/>
+                  <div style={{fontWeight:800, fontSize:16}}>{safeStr(m?.name)}</div>
+                  <div style={{color:"var(--dim)", fontSize:12}}>{safeStr(m?.brand)} {safeStr(m?.model)}</div>
+                  <div className="mono" style={{fontSize:11, color:"var(--mute)", marginTop:4}}>{m.id}</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </ErrorBoundary>
+    </div>
+  );
+};
+
+// --- DASHBOARD (YÖNETİCİ EKRANI) ---
+const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData }) => {
+  const [tab, setTab] = useState("overview"); 
+  const [selMacDetail, setSelMacDetail] = useState(null);
+  
+  const [search, setSearch] = useState("");
+  const [openSearch, setOpenSearch] = useState("");
+  const [maintSearch, setMaintSearch] = useState("");
+  const [filtCat, setFiltCat] = useState("");
+  const [filtMonth, setFiltMonth] = useState(new Date().toISOString().slice(0,7));
+  const [listCatFilter, setListCatFilter] = useState("");
+  const [bulkMacs, setBulkMacs] = useState([]);
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [leaderboardType, setLeaderboardType] = useState(null);
+
+  const activeFaults = safeArr(data.faults).filter(f => f && f.status === "open" && safeArr(data.machines).some(m => m && m.id === f.macId));
+
+  const maintenanceRadar = useMemo(() => {
+    const alerts = [];
+    const todayMs = Date.now();
+    safeArr(data.machines).forEach(mac => {
+      if(!mac) return;
+      const cat = safeArr(data.categories).find(c => c && c.id === mac.catId);
+      if(!cat) return;
+      
+      const hasCustomTpl = mac.templates && Object.keys(safeObj(mac.templates)).length > 0;
+      const tpls = safeObj(hasCustomTpl ? mac.templates : cat.templates);
+      
+      Object.entries(tpls).forEach(([key, tpl]) => {
+        if(!tpl || typeof tpl !== 'object') return; 
+
+        const last = safeArr(data.maintenance).filter(m => m && m.macId === mac.id && m.type === key).sort((a,b)=>safeTime(b.date)-safeTime(a.date))[0];
+        let diffDays = -999;
+        const pDays = Number(tpl.periodDays)||0;
+        
+        if(last && last.date && !isNaN(new Date(last.date).getTime())) {
+          const nextMs = new Date(last.date).getTime() + (pDays * 86400000);
+          diffDays = Math.ceil((nextMs - todayMs) / 86400000);
+          
+          if (pDays <= 3) {
+             if (diffDays < 0) alerts.push({ mac, cat, label: safeStr(tpl.label), diffDays });
+          } else {
+             if (diffDays <= 3) alerts.push({ mac, cat, label: safeStr(tpl.label), diffDays });
+          }
+        } else {
+          alerts.push({ mac, cat, label: safeStr(tpl.label), diffDays: -999 }); 
+        }
+      });
+    });
+    return alerts.sort((a,b) => a.diffDays - b.diffDays);
+  }, [data.machines, data.categories, data.maintenance]);
+
+  const analytics = useMemo(() => {
+    let targetMacs = safeArr(data.machines);
+    if(filtCat) targetMacs = targetMacs.filter(m => m && m.catId === filtCat);
+    
+    let allFaults = [];
+    let reasonCounts = {};
+    
+    let totalOilGaps = 0;
+    let oilGapCount = 0;
+
+    const processed = targetMacs.map(mac => {
+      if(!mac) return null;
+      let totalMins = 0, fCount = 0, oCount = 0, faultMins = 0;
+      let faultDates = [];
+      let oilDates = []; 
+
+      safeArr(data.faults).filter(f => f && f.macId === mac.id && f.status === "closed" && f.type !== "bakim").forEach(f => {
+        if(filtMonth && f.end) {
+          const ymd = toYMD(f.end);
+          if(ymd && !ymd.startsWith(filtMonth)) return; 
+        }
+        
+        allFaults.push(f);
+        const rSafe = safeStr(f.reason);
+        reasonCounts[rSafe] = (reasonCounts[rSafe] || 0) + 1;
+        const d = (Number(f.downtime) || 0);
+        totalMins += d;
+
+        if(f.type === "ariza") { 
+          fCount++; 
+          faultMins += d;
+          if(f.start) {
+            const t = new Date(f.start).getTime();
+            if(!isNaN(t)) faultDates.push(t);
+          }
+        } else { 
+          oCount++; 
+        }
+      });
+      
+      safeArr(data.maintenance).filter(m => m && m.macId === mac.id).forEach(m => {
+          const cat = safeArr(data.categories).find(c => c && c.id === mac.catId) || {};
+          const hasCustomTpl = mac.templates && Object.keys(safeObj(mac.templates)).length > 0;
+          const tpls = safeObj(hasCustomTpl ? mac.templates : (cat.templates || {}));
+          
+          let tName = m.type;
+          if (tpls[m.type] && tpls[m.type].label) tName = tpls[m.type].label;
+          
+          const nameLower = safeStr(tName).toLowerCase();
+          if(nameLower.includes("yağ") || nameLower.includes("yag") || nameLower.includes("oil")) {
+              const t = new Date(m.date).getTime();
+              if(!isNaN(t)) oilDates.push(t);
+          }
+      });
+      
+      if (oilDates.length > 1) {
+          oilDates.sort((a,b) => a - b);
+          for(let i=1; i<oilDates.length; i++) {
+              totalOilGaps += (oilDates[i] - oilDates[i-1]);
+              oilGapCount++;
+          }
+      }
+
+      const mttr = fCount > 0 ? Math.round(faultMins / fCount) : 0; 
+      let mtbf = "Veri Yok";
+      if (faultDates.length > 1) {
+        faultDates.sort((a,b) => a - b);
+        let totalDiff = 0;
+        for(let i=1; i<faultDates.length; i++) totalDiff += (faultDates[i] - faultDates[i-1]);
+        const avgDays = (totalDiff / (faultDates.length - 1)) / 86400000;
+        mtbf = avgDays.toFixed(1) + " Gün";
+      }
+
+      return { ...mac, totalMins, fCount, oCount, mttr, mtbf };
+    }).filter(m => m && (m.totalMins > 0 || m.fCount > 0 || m.oCount > 0)).sort((a,b) => b.totalMins - a.totalMins);
+
+    const topDowntime = processed.length > 0 ? processed[0] : null;
+    const topFaults = [...processed].sort((a,b) => b.fCount - a.fCount)[0];
+    
+    let topReason = { reason: "Yok", count: 0 };
+    Object.entries(reasonCounts).forEach(([r, c]) => { if(c > topReason.count) topReason = { reason: r, count: c }; });
+
+    const globalFaults = allFaults.filter(f => f.type === "ariza");
+    const globalDowntime = globalFaults.reduce((sum, f) => sum + (Number(f.downtime)||0), 0);
+    const globalMttr = globalFaults.length > 0 ? Math.round(globalDowntime / globalFaults.length) : 0;
+    
+    const avgOilDays = oilGapCount > 0 ? Math.round((totalOilGaps / oilGapCount) / 86400000) : null;
+
+    return { list: processed, topDowntime, topFaults, topReason, globalMttr, avgOilDays };
+  }, [data.machines, data.faults, data.maintenance, data.categories, filtCat, filtMonth]);
+
+  const downloadCSV = (type) => {
+    let csvContent = "\uFEFF"; 
+    const escapeField = (field) => {
+      if (field === null || field === undefined) return '""';
+      const str = String(field).replace(/"/g, '""').replace(/\n/g, ' '); 
+      return `"${str}"`; 
+    };
+
+    if (type === 'faults') {
+      csvContent += "Kayıt ID,Makine Adı,Kategori,Kayıt Tipi,Durum,Sebep,Açıklama,Başlangıç Tarihi,Bitiş Tarihi,Duruş Süresi (Dk),Bildiren,Kapatan,Kapatma Notu,Değişen Parçalar\n";
+      safeArr(data.faults).forEach(f => {
+        if (!f) return;
+        const mac = safeArr(data.machines).find(m => m && m.id === f.macId) || {};
+        const cat = safeArr(data.categories).find(c => c && c.id === mac.catId) || {};
+        const row = [f.id, mac.name || "Silinmiş", cat.name || "Silinmiş", f.type, f.status, f.reason, f.desc, f.start ? toDTL(f.start).replace('T', ' ') : "", f.end ? toDTL(f.end).replace('T', ' ') : "", f.downtime || 0, f.by, f.closedBy, f.closeNote, f.materials].map(escapeField).join(",");
+        csvContent += row + "\n";
+      });
+    } else if (type === 'maint') {
+      csvContent += "Kayıt ID,Makine Adı,Kategori,Bakım Şablonu,Tarih,Yapan Kişi,İşaretlenen Kontroller,Notlar\n";
+      safeArr(data.maintenance).forEach(m => {
+        if (!m) return;
+        const mac = safeArr(data.machines).find(mac => mac && mac.id === m.macId) || {};
+        const cat = safeArr(data.categories).find(c => c && c.id === mac.catId) || {};
+        let tName = m.type;
+        const hasCustomTpl = mac.templates && Object.keys(safeObj(mac.templates)).length > 0;
+        const tpls = safeObj(hasCustomTpl ? mac.templates : (cat.templates || {}));
+        if (tpls[m.type] && tpls[m.type].label) tName = tpls[m.type].label;
+        const row = [m.id, mac.name || "Silinmiş", cat.name || "Silinmiş", tName, m.date ? toDTL(m.date).replace('T', ' ') : "", m.by, m.checks, m.notes].map(escapeField).join(",");
+        csvContent += row + "\n";
+      });
+    }
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `ProX_${type === 'faults' ? 'Ariza_Durus' : 'Bakim'}_Raporu_${toYMD(new Date())}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleMacCheck = (mac, checked) => {
+    if(checked) setBulkMacs([...bulkMacs, mac]);
+    else setBulkMacs(bulkMacs.filter(m => m.id !== mac.id));
+  };
+
+  return (
+    <div style={{padding:24, maxWidth:1200, margin:"0 auto"}}>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:10, marginBottom:20}}>
+        <div><h1 style={{fontSize:26, fontWeight:900}}><span style={{color:"var(--blue)"}}>Pro-X</span> CMMS <InfoBtn msg="Bilgisayarlı Bakım Yönetim Sistemi (Computerized Maintenance Management System)" /></h1></div>
+        <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
+          <button className="btn btn-amber" onClick={() => setPg("qr")}>🔳 QR & Barkod</button>
+          <button className="btn btn-ghost" onClick={() => setPg("mob")}>📱 Saha Uygulaması</button>
+          <button className="btn btn-blue" onClick={() => checkPw(() => setModal({type:"add_machine"}))}>+ Makine</button>
+          <button className="btn btn-purple" onClick={() => checkPw(() => setModal({type:"add_cat"}))}>⚙️ Kategoriler</button>
+        </div>
+      </div>
+
+      <div className="tabs" style={{marginBottom:20, maxWidth:800}}>
+        <div className={`tab ${tab==="overview"?"active":""}`} onClick={()=>{setTab("overview"); setBulkMacs([]); setListCatFilter("");}}>📍 Makine Parkuru <InfoBtn msg="Tesisinizdeki tüm makinelerin güncel durumunu ve yaklaşan bakımlarını gösterir." /></div>
+        <div className={`tab ${tab==="open"?"active":""}`} onClick={()=>{setTab("open"); setListCatFilter("");}}>🚨 Bekleyenler ({activeFaults.length}) <InfoBtn msg="Sahadan bildirilen ve henüz bakım ekibi tarafından kapatılmamış arıza/duruş kayıtları." /></div>
+        <div className={`tab ${tab==="maint"?"active":""}`} onClick={()=>{setTab("maint"); setListCatFilter("");}}>🔔 Bakım Takibi ({maintenanceRadar.length}) <InfoBtn msg="Uzun periyotlu bakımlarda son 3 gün kala, günlük/kısa bakımlarda ise sadece geciktiğinde uyarı veren aciliyet listesi." /></div>
+        <div className={`tab ${tab==="analytics"?"active":""}`} onClick={()=>setTab("analytics")}>📈 İstatistik & KPI <InfoBtn msg="Tesisin genel performansını, duruş analizlerini ve temel metrikleri gösterir." /></div>
+      </div>
+
+      {tab !== "analytics" && (
+        <div style={{display:"flex", gap:10, marginBottom:20, flexWrap:"wrap"}}>
+          <div className="search-bar" style={{flex:1, minWidth:250, marginBottom:0}}>
+            <span style={{marginRight:10}}>🔍</span>
+            <input 
+              placeholder="Ara (Makine, kod, marka veya arıza...)" 
+              value={tab === "overview" ? search : tab === "open" ? openSearch : maintSearch} 
+              onChange={e=>{
+                if(tab === "overview") setSearch(e.target.value);
+                else if(tab === "open") setOpenSearch(e.target.value);
+                else setMaintSearch(e.target.value);
+              }} 
+            />
+          </div>
+          <select className="inp" style={{width:"auto", minWidth:200}} value={listCatFilter} onChange={e=>setListCatFilter(e.target.value)}>
+            <option value="">-- Tüm Kategoriler --</option>
+            {safeArr(data.categories).map(c => c && <option key={c.id} value={c.id}>{safeStr(c.name)}</option>)}
+          </select>
+        </div>
+      )}
+
+      {tab === "overview" && (
+        <ErrorBoundary>
+          {safeArr(data.categories).map(cat => {
+            if(!cat) return null;
+            if(listCatFilter && cat.id !== listCatFilter) return null;
+            const macs = safeArr(data.machines).filter(m => m && m.catId === cat.id && (safeStr(m.name).toLowerCase().includes(search.toLowerCase()) || safeStr(m.brand).toLowerCase().includes(search.toLowerCase())));
+            if(macs.length === 0) return null;
+            return (
+              <div key={cat.id} style={{marginBottom:24}}>
+                <div style={{display:"flex", alignItems:"center", gap:10, borderBottom:"1px solid var(--border)", paddingBottom:8, marginBottom:12}}>
+                  <h3 style={{fontSize:16, fontWeight:800, color:"var(--dim)"}}>{safeStr(cat.name).toUpperCase()} <span style={{fontSize:12, fontWeight:500}}>({macs.length})</span></h3>
+                  <button className="btn btn-ghost btn-xs" onClick={()=>checkPw(()=>setModal({type:"edit_cat", cat}))}>Kategoriyi Düzenle ✏️</button>
+                </div>
+                <div className="g-auto">
+                  {macs.map(m => {
+                    const hasCustomTpl = m.templates && Object.keys(safeObj(m.templates)).length > 0;
+                    const tpls = safeObj(hasCustomTpl ? m.templates : (cat?.templates || {}));
+                    const mTrackers = [];
+                    const todayMs = Date.now();
+                    Object.entries(tpls).forEach(([key, tpl]) => {
+                      if(!tpl) return;
+                      const last = safeArr(data.maintenance).filter(mnt => mnt && mnt.macId === m.id && mnt.type === key).sort((a,b)=>safeTime(b.date)-safeTime(a.date))[0];
+                      const pDays = Number(tpl.periodDays) || 0;
+                      let diffDays = -999, progress = 0;
+                      if(last && last.date && !isNaN(new Date(last.date).getTime())) {
+                          const nextMs = new Date(last.date).getTime() + (pDays * 86400000);
+                          diffDays = Math.ceil((nextMs - todayMs) / 86400000);
+                          progress = pDays > 0 ? Math.min(100, Math.max(0, ((pDays - diffDays) / pDays) * 100)) : 100;
+                      }
+                      mTrackers.push({ label: tpl.label, diffDays, progress, pDays });
+                    });
+                    mTrackers.sort((a,b) => a.diffDays - b.diffDays);
+                    const isChecked = bulkMacs.some(x => x.id === m.id);
+
+                    return (
+                    <div key={m.id} className={`card ${m.status === 'fault' ? 'pulse-fault' : m.status === 'stopped' ? 'pulse-stopped' : ''}`} style={{borderColor: m.status==="fault"?"#ef444490":m.status==="stopped"?"#f59e0b90": isChecked ? "var(--blue)" : "var(--border)", cursor:"pointer"}} onClick={()=>setSelMacDetail({mac:m, cat:cat})}>
+                      <input type="checkbox" className="mac-check" checked={isChecked} onChange={(e)=>handleMacCheck(m, e.target.checked)} onClick={e=>e.stopPropagation()} title="Toplu Bakım için Seç" />
+                      <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", paddingRight: 30}}>
+                        <div><div style={{fontWeight:800, fontSize:16}}>{safeStr(m.name)}</div><div style={{fontSize:11, color:"var(--dim)", marginTop:2}}>{safeStr(m.brand)} {safeStr(m.model)}</div></div>
+                        <div style={{display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6}}>
+                          <span className="badge" style={{background: m.status==="active"?"#10b98120":m.status==="fault"?"#ef444420":"#f59e0b20", color: m.status==="active"?"var(--green)":m.status==="fault"?"var(--red)":"var(--amber)"}}>{m.status === "active" ? "ÇALIŞIYOR" : m.status === "fault" ? "ARIZALI" : "DURDU"}</span>
+                          <button className="btn btn-ghost btn-xs" onClick={(e)=>{e.stopPropagation(); checkPw(()=>setModal({type:"edit_machine", mac:m}));}}>Ayarlar</button>
+                        </div>
+                      </div>
+                      
+                      {mTrackers.length > 0 && (
+                        <div style={{marginTop: 12, paddingTop: 10, borderTop: "1px dashed var(--border)"}}>
+                          {mTrackers.map((tr, idx) => (
+                            <div key={idx} style={{marginBottom: 6}}>
+                              <div style={{display:"flex", justifyContent:"space-between", fontSize:10, color:"var(--dim)", fontWeight:700, marginBottom:2}}>
+                                <span>{safeStr(tr.label)}</span>
+                                <span style={{color: tr.diffDays < 0 ? "var(--red)" : tr.diffDays <= 3 ? "var(--amber)" : "var(--green)"}}>
+                                  {tr.diffDays === -999 ? "Hiç Yapılmadı" : tr.diffDays < 0 ? `${Math.abs(tr.diffDays)} Gün Gecikti` : `${tr.diffDays} Gün Kaldı`}
+                                </span>
+                              </div>
+                              <div className="mini-prog-bg">
+                                 <div className="mini-prog-fill" style={{
+                                    width: tr.diffDays === -999 || tr.diffDays < 0 ? '100%' : `${tr.progress}%`,
+                                    background: tr.diffDays < 0 || tr.diffDays === -999 ? "var(--red)" : tr.diffDays <= 3 ? "var(--amber)" : "var(--green)"
+                                 }}></div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )})}
+                </div>
+              </div>
+            );
+          })}
+          
+          {bulkMacs.length > 0 && (
+            <button className="btn btn-blue bulk-btn-float" onClick={()=>checkPw(()=>setShowBulkModal(true))}>
+              ⚡ Seçili {bulkMacs.length} Makineye Toplu Bakım Gir
+            </button>
+          )}
+        </ErrorBoundary>
+      )}
+
+      {tab === "open" && (
+        <ErrorBoundary>
+          <div style={{display:"flex", flexDirection:"column", gap:10}}>
+            {activeFaults.length === 0 ? <div className="card" style={{textAlign:"center", color:"var(--dim)", padding:40}}>Bekleyen iş emri yok.</div> : null}
+            {activeFaults.filter(f => {
+              const mac = safeArr(data.machines).find(m => m && m.id === f.macId);
+              if (!mac) return false; 
+              if (listCatFilter && mac?.catId !== listCatFilter) return false;
+              
+              const mName = mac ? safeStr(mac.name).toLowerCase() : "";
+              const term = openSearch.toLowerCase();
+              return mName.includes(term) || safeStr(f.desc).toLowerCase().includes(term) || safeStr(f.by).toLowerCase().includes(term);
+            }).map(f => {
+              const mac = safeArr(data.machines).find(m => m && m.id === f.macId);
+              return (
+                <div key={f.id} className={`card ${f.type==='ariza'?'pulse-fault':'pulse-stopped'}`} style={{borderLeft: `4px solid ${f.type==="ariza"?"var(--red)":f.type==="durus"?"var(--amber)":"var(--blue)"}`}}>
+                  <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:10}}>
+                    <div>
+                      <div style={{display:"flex", alignItems:"center", gap:8}}><span style={{fontWeight:800, fontSize:16}}>{safeStr(mac?.name)}</span><span className="badge" style={{background:"var(--inp)", color:"var(--dim)"}}>{safeStr(f.type).toUpperCase()}</span></div>
+                      <div style={{fontSize:12, color:"var(--dim)", marginTop:4}}>Bildiren: <b style={{color:"var(--text)"}}>{safeStr(f.by)}</b> • Tarih: {fd(f.start)}</div>
+                      <div style={{fontSize:14, marginTop:8}}><span style={{fontWeight:800, color:f.type==="ariza"?"var(--red)":"var(--amber)"}}>[{safeStr(f.reason)}]</span> {safeStr(f.desc)}</div>
+                    </div>
+                    <button className="btn btn-green" onClick={()=>checkPw(() => setRepTgt(f))}>🔧 Kapat</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </ErrorBoundary>
+      )}
+
+      {tab === "maint" && (
+        <ErrorBoundary>
+          <div style={{display:"flex", flexDirection:"column", gap:10}}>
+            {maintenanceRadar.length === 0 && <div className="card" style={{textAlign:"center", color:"var(--dim)", padding:30}}>Yaklaşan veya geciken bakım yok.</div>}
+            {maintenanceRadar.filter(r => {
+              if (listCatFilter && r.mac?.catId !== listCatFilter) return false;
+              return safeStr(r.mac?.name).toLowerCase().includes(maintSearch.toLowerCase());
+            }).map((r, i) => (
+              <div key={i} className="card clickable-row" style={{borderLeft: `4px solid ${r.diffDays<0?"var(--red)":"var(--amber)"}`}} onClick={()=>setSelMacDetail({mac:r.mac, cat:r.cat})}>
+                <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                  <div><div style={{fontWeight:800, fontSize:16}}>{safeStr(r.mac?.name)} <span style={{fontSize:12, color:"var(--dim)", fontWeight:500}}>({safeStr(r.cat?.name)})</span></div><div style={{fontSize:13, color:"var(--blue)", marginTop:4}}>{safeStr(r.label)}</div></div>
+                  <div style={{textAlign:"right", fontWeight:900, fontSize:15, color:r.diffDays<0?"var(--red)":"var(--amber)"}}>
+                    {r.diffDays === -999 ? "HİÇ YAPILMADI!" : r.diffDays < 0 ? `${Math.abs(r.diffDays)} GÜN GECİKTİ!` : `${r.diffDays} Gün Kaldı`}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </ErrorBoundary>
+      )}
+
+      {tab === "analytics" && (
+        <ErrorBoundary>
+          <div>
+            <div className="card" style={{background:"var(--inp)", marginBottom:16}}>
+               <div className="lbl" style={{marginBottom:10}}>VERİ DIŞA AKTARIM (EXCEL / CSV)</div>
+               <div style={{display:"flex", gap:10, flexWrap:"wrap"}}>
+                  <button className="btn btn-ghost" onClick={()=>downloadCSV('faults')}>⬇️ Arıza & Duruş Raporunu İndir</button>
+                  <button className="btn btn-ghost" onClick={()=>downloadCSV('maint')}>⬇️ Planlı Bakım Raporunu İndir</button>
+               </div>
+               <div style={{fontSize:11, color:"var(--mute)", marginTop:8}}>* İndirilen dosyayı Excel'de açarak gelişmiş filtrelemeler yapabilirsiniz.</div>
+            </div>
+
+            <div className="filters">
+              <div><label className="lbl">AY <InfoBtn msg="Seçilen aydaki bitmiş duruş ve arızaları hesaplar." /></label><input type="month" className="inp" value={filtMonth} onChange={e=>setFiltMonth(e.target.value)} style={{padding:"6px 10px"}}/></div>
+              <div><label className="lbl">KATEGORİ <InfoBtn msg="Sadece seçilen kategoriye ait makineleri listeler." /></label>
+                <select className="inp" value={filtCat} onChange={e=>setFiltCat(e.target.value)} style={{padding:"6px 10px"}}>
+                  <option value="">Tümü</option>
+                  {safeArr(data.categories).map(c => c && <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              {(filtMonth || filtCat) && <button className="btn btn-ghost btn-sm" style={{marginTop:15}} onClick={()=>{setFiltMonth(""); setFiltCat("");}}>Sıfırla</button>}
+            </div>
+
+            <div className="grid-4" style={{marginBottom:16}}>
+              <div className="card clickable-card" onClick={() => setLeaderboardType('downtime')} style={{background:"var(--inp)", borderLeft:"3px solid var(--red)"}} title="Sıralamayı Görmek İçin Tıklayın">
+                <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                   <div className="lbl" style={{margin:0}}>EN ÇOK DURUŞ YAŞAYAN <InfoBtn msg="Filtrelenen dönemde toplam duruş süresi en yüksek olan makineyi ve genel sıralamasını gösterir."/></div>
+                </div>
+                <div style={{fontSize:16, fontWeight:800, marginTop:4, color:"var(--red)"}}>{analytics.topDowntime ? safeStr(analytics.topDowntime.name) : "Yok"}</div>
+                <div style={{fontSize:12, color:"var(--dim)", marginTop:2}}>{analytics.topDowntime ? `${analytics.topDowntime.totalMins} dk durdu` : "—"}</div>
+                <div style={{fontSize:10, color:"var(--blue)", marginTop:8, fontWeight:700, textAlign:"right"}}>Sıralamayı Gör ➔</div>
+              </div>
+              
+              <div className="card clickable-card" onClick={() => setLeaderboardType('faults')} style={{background:"var(--inp)", borderLeft:"3px solid var(--amber)"}} title="Sıralamayı Görmek İçin Tıklayın">
+                <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                   <div className="lbl" style={{margin:0}}>EN ÇOK ARIZA YAPAN <InfoBtn msg="Filtrelenen dönemde en fazla arıza (düzeltici bakım) kaydı açılan makineyi gösterir."/></div>
+                </div>
+                <div style={{fontSize:16, fontWeight:800, marginTop:4, color:"var(--amber)"}}>{analytics.topFaults ? safeStr(analytics.topFaults.name) : "Yok"}</div>
+                <div style={{fontSize:12, color:"var(--dim)", marginTop:2}}>{analytics.topFaults ? `${analytics.topFaults.fCount} kez bozuldu` : "—"}</div>
+                <div style={{fontSize:10, color:"var(--blue)", marginTop:8, fontWeight:700, textAlign:"right"}}>Sıralamayı Gör ➔</div>
+              </div>
+              
+              <div className="card" style={{background:"var(--inp)", borderLeft:"3px solid var(--blue)"}}>
+                <div className="lbl">ORT. TAMİR SÜRESİ (MTTR) <InfoBtn msg="Mean Time To Repair (Ortalama Tamir Süresi): Bir arızanın bildirilmesiyle kapatılması arasında geçen ortalama dakika."/></div>
+                <div style={{fontSize:24, fontWeight:900, marginTop:4, color:"var(--blue)"}}>{analytics.globalMttr} <span style={{fontSize:12}}>dk</span></div>
+              </div>
+              
+              {/* YENİ: YAĞ DEĞİŞİM PERİYODU KUTUSU */}
+              <div className="card" style={{background:"var(--inp)", borderLeft:"3px solid #f97316"}}>
+                <div className="lbl">ORT. YAĞ DEĞİŞİM SÜRESİ <InfoBtn msg="Bu kategorideki makinelerin geçmişte 'Yağ' veya 'Oil' geçen bakımları arasında ortalama kaç gün geçtiğini gösterir."/></div>
+                <div style={{fontSize:18, fontWeight:800, marginTop:4, color:"#fdba74"}}>{analytics.avgOilDays ? `${analytics.avgOilDays} Gün` : "Veri Yok"}</div>
+                <div style={{fontSize:12, color:"var(--dim)", marginTop:2}}>{filtCat ? "Seçili Kategori Ortalaması" : "Tüm Tesis Ortalaması"}</div>
+              </div>
+            </div>
+
+            <div className="card">
+              <table style={{width:"100%"}}>
+                <thead><tr style={{background:"var(--inp)"}}>
+                  <th>Makine <InfoBtn msg="Makinenin adı ve kodu" /></th>
+                  <th>Arıza <InfoBtn msg="Makine kaynaklı bozulmaların sayısı" /></th>
+                  <th>Opr. Duruş <InfoBtn msg="Makine çalışmaya hazır olduğu halde dış sebeplerle (tel, kalıp) üretimin durması."/></th>
+                  <th>MTTR (Tamir) <InfoBtn msg="Ortalama Tamir Süresi: Bir arızanın bildirilmesiyle kapatılması arasında geçen ortalama süre."/></th>
+                  <th>MTBF (Aralık) <InfoBtn msg="Arızalar Arası Ortalama Süre: Bu makine ortalama kaç günde bir bozuluyor?"/></th>
+                  <th style={{textAlign:"right"}}>Duruş Süresi <InfoBtn msg="Arıza ve operasyonel duruşların toplam dakika bazında süresi."/></th>
+                </tr></thead>
+                <tbody>
+                  {analytics.list.length === 0 && <tr><td colSpan="6" style={{textAlign:"center", padding:30}}>Kayıt bulunamadı.</td></tr>}
+                  {analytics.list.map(m => (
+                    <tr key={m.id} className="clickable-row" onClick={()=>{const c = safeArr(data.categories).find(x=>x&&x.id===m.catId); setSelMacDetail({mac:m, cat:c});}}>
+                      <td style={{fontWeight:800, color:"var(--blue)"}}>{m.name}</td>
+                      <td>{m.fCount}</td>
+                      <td>{m.oCount}</td>
+                      <td style={{fontWeight:700, color:"var(--amber)"}}>{m.mttr} dk</td>
+                      <td style={{fontWeight:700, color:"var(--green)"}}>{m.mtbf}</td>
+                      <td style={{fontWeight:900, color:"var(--red)", textAlign:"right", fontSize:15}}>{m.totalMins} dk</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{fontSize:11, color:"var(--dim)", marginTop:10, textAlign:"right"}}>* Makine detaylarını ve tüm geçmişini görmek için satıra tıklayın.</div>
+            </div>
+          </div>
+        </ErrorBoundary>
+      )}
+
+      {leaderboardType && (
+         <LeaderboardModal 
+            type={leaderboardType} 
+            data={data} 
+            filtMonth={filtMonth} 
+            onClose={() => setLeaderboardType(null)} 
+            onSelectMac={(m) => {
+               setLeaderboardType(null); 
+               const c = safeArr(data.categories).find(x => x && x.id === m.catId);
+               setSelMacDetail({mac: m, cat: c});
+            }} 
+         />
+      )}
+
+      {/* HATA DÜZELTİLDİ: Toplu Bakım kapanınca ekran otomatik yenileniyor */}
+      {showBulkModal && <BulkMaintModal selectedMacs={bulkMacs} data={data} sendData={sendData} onClose={() => {setShowBulkModal(false); setBulkMacs([]); fetchData(true);}} />}
+      {selMacDetail && <MachineDetailModal mac={selMacDetail.mac} cat={selMacDetail.cat} data={data} onClose={()=>setSelMacDetail(null)} sendData={sendData} checkPw={checkPw} />}
+    </div>
+  );
+};
+
+// --- MOBİL SAHA UYGULAMASI ---
+const Mobile = ({ data, setPg, sendData, initialMacId, setRepTgt }) => {
+  const [selCat, setSelCat] = useState(null); 
+  const [selMac, setSelMac] = useState(null); 
+  const [type, setType] = useState("durus"); 
+  const [reason, setReason] = useState("");
+  const [desc, setDesc] = useState("");
+  const [by, setBy] = useState("");
+  const [selTplKey, setSelTplKey] = useState("");
+  const [checks, setChecks] = useState({});
+  const [formDate, setFormDate] = useState(toDTL(new Date())); 
+  const [consumedQr, setConsumedQr] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false); 
+  const [isSubmitting, setIsSubmitting] = useState(false); 
+
+  useEffect(() => {
+    if(initialMacId && safeArr(data.machines).length > 0 && !consumedQr) {
+      const targetMac = safeArr(data.machines).find(m => m && m.id === initialMacId);
+      if(targetMac) {
+        setSelCat(safeArr(data.categories).find(c => c && c.id === targetMac.catId));
+        setSelMac(targetMac);
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+      setConsumedQr(true);
+    }
+  }, [initialMacId, data, consumedQr]);
+
+  const handleSubmit = async () => {
+    if(!by) return alert("Ad Soyad zorunludur!");
+    if(!formDate) return alert("HATA: Tarih ve saat alanı boş bırakılamaz!"); 
+    
+    if (new Date(formDate) > new Date()) {
+       return alert("HATA: İleri bir tarih/saat seçemezsiniz!");
+    }
+
+    setIsSubmitting(true); 
+    const isoDate = formDate; 
+
+    if(type === "bakim") {
+      if(!selTplKey) { setIsSubmitting(false); return alert("Lütfen şablon seçin!"); }
+      const hasCustomTpl = selMac?.templates && Object.keys(safeObj(selMac.templates)).length > 0;
+      const tpls = safeObj(hasCustomTpl ? selMac.templates : (selCat?.templates || {}));
+      const tpl = tpls[selTplKey];
+      if(!tpl) { setIsSubmitting(false); return alert("Seçili şablon bulunamadı!"); } 
+      const doneItems = safeArr(tpl.items).filter((_, i) => checks[i]); 
+      if(doneItems.length === 0) { setIsSubmitting(false); return alert("Kontrol maddesi işaretlemediniz!"); }
+      const success = await sendData("log_maint", { id: "MNT-"+uid(), machineId: selMac.id, maintType: selTplKey, person: by, checks: doneItems.join(", "), notes: desc, customDate: isoDate });
+      setIsSubmitting(false); 
+      if(success) { setIsSuccess(true); } 
+      return;
+    }
+    if(!desc || !reason) { setIsSubmitting(false); return alert("Sebep ve Açıklama zorunludur!"); }
+    const success = await sendData("report_fault", { id: "FLT-"+uid(), machineId: selMac.id, type, reason: reason, desc, reportedBy: by, customDate: isoDate });
+    setIsSubmitting(false); 
+    if(success) { setIsSuccess(true); } 
+  };
+
+  // YENİ: MOBİL BAŞARI EKRANI
+  if (isSuccess) {
+      return (
+          <div style={{maxWidth:450, margin:"0 auto", padding:16}}>
+            <div className="card" style={{textAlign:"center", padding:"40px 20px", border:"2px solid var(--green)", background:"rgba(16,185,129,0.05)"}}>
+              <div style={{fontSize:50, marginBottom:16}}>✅</div>
+              <h2 style={{color:"var(--green)", marginBottom:10, fontWeight:900}}>İşlem Başarılı!</h2>
+              <p style={{color:"var(--text)", fontSize:14, marginBottom:24}}>Kayıt sisteme kaydedildi. Bu sekmeyi güvenle kapatabilirsiniz.</p>
+              <button className="btn btn-ghost" style={{justifyContent:"center", width:"100%"}} onClick={() => {setIsSuccess(false); setSelMac(null); setSelCat(null); setPg("dash");}}>Ana Panele Dön</button>
+            </div>
+          </div>
+      );
+  }
+
+  if (!selCat && !selMac) return (
+    <div style={{maxWidth:450, margin:"0 auto", padding:16}}>
+      <ErrorBoundary>
+        <div style={{textAlign:"center", marginBottom:24}}><h2 style={{fontSize:22, fontWeight:900}}>Kategori Seçin</h2></div>
+        <div style={{display:"flex", flexDirection:"column", gap:12}}>
+          {safeArr(data.categories).map(c => {
+            if(!c) return null;
+            return <div key={c.id} className="card clickable-row" style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:20}} onClick={()=>setSelCat(c)}><span style={{fontWeight:800, fontSize:16}}>{safeStr(c.name)}</span><span style={{color:"var(--dim)"}}>→</span></div>
+          })}
+          <button className="btn btn-ghost" style={{justifyContent:"center", marginTop:20}} onClick={()=>setPg("dash")}>Ana Panele Dön</button>
+        </div>
+      </ErrorBoundary>
+    </div>
+  );
+
+  if (selCat && !selMac) return (
+    <div style={{maxWidth:450, margin:"0 auto", padding:16}}>
+      <ErrorBoundary>
+        <button className="btn btn-ghost btn-sm" style={{marginBottom:16}} onClick={()=>setSelCat(null)}>← Geri</button>
+        <h2 style={{fontSize:20, fontWeight:900, marginBottom:16}}>{safeStr(selCat.name)} Seçiniz</h2>
+        <div style={{display:"flex", flexDirection:"column", gap:10}}>
+          {safeArr(data.machines).filter(m => m && m.catId === selCat.id).map(m => (
+            <div key={m.id} className="card clickable-row" style={{display:"flex", justifyContent:"space-between", alignItems:"center", borderColor: m.status!=="active"?"var(--red)":"var(--border)"}} onClick={()=>{setSelMac(m); setType("durus");}}>
+              <div style={{fontWeight:800, fontSize:15}}>{safeStr(m.name)}</div>
+              <span className="badge" style={{background:"var(--inp)", color:m.status==="active"?"var(--green)":"var(--red)"}}>{m.status==="active"?"SEÇ":"DURUYOR"}</span>
+            </div>
+          ))}
+        </div>
+      </ErrorBoundary>
+    </div>
+  );
+
+  if (selMac) {
+    const hasCustomTpl = selMac?.templates && Object.keys(safeObj(selMac.templates)).length > 0;
+    const tpls = safeObj(hasCustomTpl ? selMac.templates : (selCat?.templates || {}));
+    const hasTemplates = Object.keys(tpls).length > 0;
+    
+    const openFaults = safeArr(data.faults).filter(f => f && f.status === "open" && f.macId === selMac.id);
+
+    return (
+      <div style={{maxWidth:450, margin:"0 auto", padding:16}}>
+        <ErrorBoundary>
+          <button className="btn btn-ghost btn-sm" style={{marginBottom:16}} onClick={()=>setSelMac(null)}>← Makinelere Dön</button>
+          <div className="card" style={{marginBottom:16, borderBottom:"3px solid var(--blue)"}}>
+            <div style={{fontWeight:900, fontSize:20}}>{safeStr(selMac?.name)}</div>
+            <div style={{fontSize:12, color:"var(--dim)", marginTop:2}}>{safeStr(selCat?.name)} • {safeStr(selMac?.brand)}</div>
+          </div>
+
+          <div className="tabs" style={{marginBottom:16}}>
+            <div className={`tab ${type==="durus"?"active":""}`} style={type==="durus"?{background:"var(--amber)",color:"#000"}:{}} onClick={()=>setType("durus")}>🟠 Duruş</div>
+            <div className={`tab ${type==="ariza"?"active":""}`} style={type==="ariza"?{background:"var(--red)",color:"#fff"}:{}} onClick={()=>setType("ariza")}>🔴 Arıza</div>
+            <div className={`tab ${type==="bakim"?"active":""}`} style={type==="bakim"?{background:"var(--green)",color:"#fff"}:{}} onClick={()=>setType("bakim")}>🟢 Bakım</div>
+            <div className={`tab ${type==="open"?"active":""}`} style={type==="open"?{background:"var(--purple)",color:"#fff"}:{}} onClick={()=>setType("open")}>🔧 Açık İşler ({openFaults.length})</div>
+          </div>
+
+          <div className="card">
+            
+            {type === "open" ? (
+               <div style={{display:"flex", flexDirection:"column", gap:12}}>
+                 {openFaults.length === 0 ? <div style={{textAlign:"center", color:"var(--dim)", padding:20}}>Bu makinede açık iş emri yok.</div> : null}
+                 {openFaults.map(f => (
+                   <div key={f.id} style={{padding:12, background:"var(--inp)", borderRadius:8, borderLeft: `4px solid ${f.type==="ariza"?"var(--red)":"var(--amber)"}`}}>
+                      <div style={{fontSize:11, color:"var(--mute)", marginBottom:4}}>{fd(f.start)} • Bildiren: {safeStr(f.by)}</div>
+                      <div style={{fontSize:14, fontWeight:"bold", color:"var(--text)"}}><span style={{color:"var(--amber)"}}>[{safeStr(f.reason)}]</span> {safeStr(f.desc)}</div>
+                      <button className="btn btn-green btn-sm" style={{width:"100%", marginTop:12, justifyContent:"center"}} onClick={() => setRepTgt(f)}>Müdahale Et & Kapat</button>
+                   </div>
+                 ))}
+               </div>
+            ) : (
+              <div style={{display:"flex", flexDirection:"column", gap:14}}>
+                {(type === "durus" || type === "ariza") && (
+                  <>
+                    <div><label className="lbl">Kayıt Tarihi / Saati <InfoBtn msg="Geçmiş bir kayıt giriyorsanız tarihi değiştirebilirsiniz."/></label>
+                      <input type="datetime-local" className="inp" value={formDate} onChange={e=>setFormDate(e.target.value)} />
+                    </div>
+                    <div><label className="lbl">Sebep * <InfoBtn msg="Makinenin neden durduğunu seçin."/></label>
+                      <select className="inp" value={reason} onChange={e=>setReason(e.target.value)}>
+                        <option value="">-- Sebep Seçin --</option>
+                        {type === "ariza" && <><option>Mekanik</option><option>Elektrik</option><option>Hidrolik/Pnömatik</option></>}
+                        {type === "durus" && safeArr(selCat?.reasons).map(r => <option key={r} value={r}>{r}</option>)}
+                        <option value="Diğer">Diğer...</option>
+                      </select>
+                    </div>
+                    <div><label className="lbl">Açıklama * <InfoBtn msg="Durumla ilgili detaylı not yazın."/></label><textarea className="inp" value={desc} onChange={e=>setDesc(e.target.value)} /></div>
+                  </>
+                )}
+
+                {type === "bakim" && (
+                  <>
+                    {!hasTemplates ? (
+                      <div style={{padding:15, color:"var(--red)", textAlign:"center"}}>Bakım şablonu tanımlanmamış.</div>
+                    ) : (
+                      <>
+                        <div><label className="lbl">Kayıt Tarihi / Saati <InfoBtn msg="Geçmiş bir kayıt giriyorsanız tarihi değiştirebilirsiniz."/></label>
+                          <input type="datetime-local" className="inp" value={formDate} onChange={e=>setFormDate(e.target.value)} />
+                        </div>
+                        <div><label className="lbl">Bakım Tipi * <InfoBtn msg="Hangi periyodik bakımın yapıldığını seçin."/></label>
+                          <select className="inp" value={selTplKey} onChange={e=>{setSelTplKey(e.target.value); setChecks({});}}>
+                            <option value="">-- Şablon Seçin --</option>
+                            {Object.entries(tpls).map(([k, v]) => {
+                              if(!v) return null;
+                              return <option key={k} value={k}>{safeStr(v.label)}</option>;
+                            })}
+                          </select>
+                        </div>
+                        {selTplKey && tpls[selTplKey] && tpls[selTplKey].items && (
+                          <div><label className="lbl">Kontrol Listesi <InfoBtn msg="Tamamladığınız adımları işaretleyin."/></label>
+                            <div style={{display:"flex", flexDirection:"column", gap:6}}>
+                              {safeArr(tpls[selTplKey].items).map((item, i) => (
+                                <div key={i} className={`chk-item ${checks[i]?"done":""}`} onClick={()=>setChecks({...checks, [i]:!checks[i]})}>
+                                  <div className={`chkbox ${checks[i]?"done":""}`}>{checks[i]?"✓":""}</div>
+                                  <span style={{fontSize:13}}>{safeStr(item)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <div><label className="lbl">Notlar</label><textarea className="inp" value={desc} onChange={e=>setDesc(e.target.value)} /></div>
+                      </>
+                    )}
+                  </>
+                )}
+                
+                {(type !== "bakim" || hasTemplates) && (
+                  <>
+                    <div><label className="lbl">Ad Soyad *</label><input className="inp" value={by} onChange={e=>setBy(e.target.value)} /></div>
+                    <button className="btn" style={{background: type==="ariza"?"var(--red)":type==="durus"?"var(--amber)":"var(--green)", color:type==="durus"?"#000":"#fff", justifyContent:"center", padding:14, fontSize:15, opacity: isSubmitting ? 0.7 : 1}} onClick={handleSubmit} disabled={isSubmitting}>
+                      {isSubmitting ? "⏳ GÖNDERİLİYOR..." : "GÖNDER"}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </ErrorBoundary>
+      </div>
+    );
+  }
+};
+
+// --- ANA UYGULAMA (APP) ---
+function App() {
+  const [data, setData] = useState({ categories: [], machines: [], faults: [], maintenance: [] });
+  const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState(null);
+  
+  const urlParams = new URLSearchParams(window.location.search);
+  const qrMacId = urlParams.get('mac');
+  
+  const [pg, setPg] = useState(qrMacId ? "mob" : "dash"); 
+  const [modal, setModal] = useState(null); 
+  const [pwUnlocked, setPwUnlocked] = useState(false);
+  const [repTgt, setRepTgt] = useState(null);
+
+  const showToast = m => { setToast(m); setTimeout(() => setToast(null), 2500); };
+  
+  const checkPw = (cb) => {
+    if(pwUnlocked) { cb(); return; }
+    const p = prompt("Yönetici Şifresi (PIN):");
+    if(p === "137998") { setPwUnlocked(true); cb(); } else if(p !== null) alert("Yanlış Şifre!");
+  };
+
+  const fetchData = (silent = false) => {
+    if(!silent) setLoading(true);
+    fetch(GOOGLE_SCRIPT_URL)
+      .then(r => r.json())
+      .then(resp => {
+        if(resp.result === "success") {
+          const cats = safeArr(resp.data.categories).slice(1).map(r => ({ id: r[0], name: r[1], reasons: safeArr(parseJSON(r[2], [])), templates: safeObj(parseJSON(r[3], {})) }));
+          const macs = safeArr(resp.data.machines).slice(1).map(r => ({ id: r[0], catId: r[1], name: r[2], brand: r[3], model: r[4], status: r[5], templates: safeObj(parseJSON(r[6], {})) }));
+          const flts = safeArr(resp.data.faults).slice(1).map(r => ({ id: r[0], macId: r[1], type: r[2], reason: r[3], desc: r[4], by: r[5], start: r[6], status: r[7], closedBy: r[8], closeNote: r[9], materials: r[10], end: r[11], downtime: r[12] }));
+          const mnts = safeArr(resp.data.maintenance).slice(1).map(r => ({ id: r[0], macId: r[1], type: r[2], by: r[3], date: r[4], checks: r[5], notes: r[6] }));
+          setData({ categories: cats, machines: macs, faults: flts, maintenance: mnts });
+        }
+        if(!silent) setLoading(false);
+      }).catch(e => { if(!silent) setLoading(false); showToast("Bağlantı Hatası"); });
+  };
+
+  useEffect(() => { 
+    fetchData(); 
+    const intv = setInterval(() => fetchData(true), 60000);
+    return () => clearInterval(intv);
+  }, []);
+
+  const sendData = (action, payload, silent = false) => {
+    if(!silent) setLoading(true);
+    const d = new URLSearchParams(); d.append("action", action);
+    for(const key in payload) d.append(key, payload[key]);
+    return fetch(GOOGLE_SCRIPT_URL, { method: "POST", body: d, headers: { "Content-Type": "application/x-www-form-urlencoded" }})
+      .then(r => r.json())
+      .then(resp => {
+        if(!silent) setLoading(false);
+        if(resp.result === "success") { if(!silent){showToast("İşlem Başarılı!"); fetchData(true);} return true; } 
+        else { alert("Hata: " + resp.message); return false; }
+      }).catch(e => { if(!silent) setLoading(false); alert("Bağlantı Hatası"); return false; });
+  };
+
+  return (
+    <ErrorBoundary>
+      <div>
+        {toast && <div className="toast">{toast}</div>}
+        {loading && <div className="loading"><div className="spinner"></div><div>Veriler Eşitleniyor...</div></div>}
+        
+        {pg === "dash" && <Dash data={data} setPg={setPg} checkPw={checkPw} setModal={setModal} setRepTgt={setRepTgt} sendData={sendData} fetchData={fetchData} />}
+        {pg === "mob" && <Mobile data={data} setPg={setPg} sendData={sendData} initialMacId={qrMacId} setRepTgt={setRepTgt} />}
+        {pg === "qr" && <QRPage data={data} setPg={setPg} />}
+        
+        {modal?.type === "add_cat" && <CategoryManagerModal onClose={() => setModal(null)} sendData={sendData} data={data} />}
+        {modal?.type === "edit_cat" && <CategoryManagerModal cat={modal.cat} onClose={() => setModal(null)} sendData={sendData} data={data} />}
+        {modal?.type === "add_machine" && <MachineManagerModal categories={data.categories} onClose={() => setModal(null)} sendData={sendData} data={data} />}
+        {modal?.type === "edit_machine" && <MachineManagerModal mac={modal.mac} categories={data.categories} onClose={() => setModal(null)} sendData={sendData} data={data} />}
+        
+        {repTgt && <RepairModal repTgt={repTgt} onClose={() => setRepTgt(null)} sendData={sendData} />}
+      </div>
+    </ErrorBoundary>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("app")).render(<App />);
+</script>
+</body>
+</html>
