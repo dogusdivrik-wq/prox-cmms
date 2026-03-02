@@ -1501,7 +1501,7 @@ const handleSelectAllCat = (catId, isSelect) => {
              onChange={(e) => handleSelectAllCat(cat.id, e.target.checked)} />
     </div>
   </div>
-                <div className={viewMode === "list" ? "g-auto" : "g-auto"} style={viewMode === "grid" ? {gridTemplateColumns:"repeat(auto-fill, minmax(130px, 1fr))", gap:10} : {}}>
+                <div className={viewMode === "list" ? "g-auto" : "g-auto"} style={viewMode === "grid" ? {gridTemplateColumns:"repeat(auto-fill, minmax(90px, 1fr))", gap:8} : {}}>
   {macs.map(m => {
                   
                     const hasCustomTpl = m.templates && Object.keys(safeObj(m.templates)).length > 0;
