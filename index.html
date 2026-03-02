@@ -1502,45 +1502,63 @@ const handleSelectAllCat = (catId, isSelect) => {
     </div>
   </div>
                 <div className={viewMode === "list" ? "g-auto" : "g-auto"} style={viewMode === "grid" ? {gridTemplateColumns:"repeat(auto-fill, minmax(75px, 1fr))", gap:6} : {}}>
-  {macs.map(m => {
-                  
-                    const hasCustomTpl = m.templates && Object.keys(safeObj(m.templates)).length > 0;
-                    const tpls = safeObj(hasCustomTpl ? m.templates : (cat?.templates || {}));
-                    const mTrackers = [];
-                    const todayMs = Date.now();
-                    Object.entries(tpls).forEach(([key, tpl]) => {
-                      if(!tpl) return;
-                      const last = safeArr(data.maintenance).filter(mnt => mnt && mnt.macId === m.id && mnt.type === key).sort((a,b)=>safeTime(b.date)-safeTime(a.date))[0];
-                      const pDays = Number(tpl.periodDays) || 0;
-                      let diffDays = -999, progress = 0;
-                      if(last && last.date && !isNaN(new Date(last.date).getTime())) {
-                          const nextMs = new Date(last.date).getTime() + (pDays * 86400000);
-                          diffDays = Math.ceil((nextMs - todayMs) / 86400000);
-                          progress = pDays > 0 ? Math.min(100, Math.max(0, ((pDays - diffDays) / pDays) * 100)) : 100;
-                      }
-                      mTrackers.push({ label: tpl.label, diffDays, progress, pDays });
-                    });
-                    mTrackers.sort((a,b) => a.diffDays - b.diffDays);
-                    const isChecked = bulkMacs.some(x => x.id === m.id);
-                    const activeF = data.faults.find(f => f.macId === m.id && f.status === "open");
-const stopReason = activeF ? safeStr(activeF.reason) : "";
-if (viewMode === "grid") {
+ {macs.map(m => {
+  const hasCustomTpl = m.templates && Object.keys(safeObj(m.templates)).length > 0;
+  const tpls = safeObj(hasCustomTpl ? m.templates : (cat?.templates || {}));
+  const mTrackers = [];
+  const todayMs = Date.now();
+  
+  Object.entries(tpls).forEach(([key, tpl]) => {
+    if(!tpl) return;
+    const last = safeArr(data.maintenance).filter(mnt => mnt && mnt.macId === m.id && mnt.type === key).sort((a,b)=>safeTime(b.date)-safeTime(a.date))[0];
+    const pDays = Number(tpl.periodDays) || 0;
+    let diffDays = -999, progress = 0;
+    if(last && last.date && !isNaN(new Date(last.date).getTime())) {
+        const nextMs = new Date(last.date).getTime() + (pDays * 86400000);
+        diffDays = Math.ceil((nextMs - todayMs) / 86400000);
+        progress = pDays > 0 ? Math.min(100, Math.max(0, ((pDays - diffDays) / pDays) * 100)) : 100;
+    }
+    mTrackers.push({ label: tpl.label, diffDays, progress, pDays });
+  });
+  
+  mTrackers.sort((a,b) => a.diffDays - b.diffDays);
+  const isChecked = bulkMacs.some(x => x.id === m.id);
+  const activeF = data.faults.find(f => f.macId === m.id && f.status === "open");
+  const stopReason = activeF ? safeStr(activeF.reason) : "";
+
+  if (viewMode === "grid") {
+    return (
+      <div key={m.id} className={`card ${m.status === 'fault' ? 'pulse-fault' : m.status === 'stopped' ? 'pulse-stopped' : ''} clickable-card`}
+           style={{
+             display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+             height: "55px", textAlign: "center", padding: "4px",
+             background: m.status === "active" ? "rgba(16,185,129,0.05)" : m.status === "fault" ? "rgba(239,68,68,0.15)" : "rgba(245,158,11,0.15)",
+             border: `2px solid ${m.status === "active" ? "var(--border)" : m.status === "fault" ? "var(--red)" : "var(--amber)"}`,
+             position: "relative", overflow: "hidden"
+           }}
+           onClick={()=>setSelMacDetail({mac:m, cat:cat})}>
+         <input type="checkbox" className="mac-check" style={{position:"absolute", top:2, right:2, width:12, height:12, margin:0}} checked={isChecked} onChange={(e)=>handleMacCheck(m, e.target.checked)} onClick={e=>e.stopPropagation()} />
+         <div style={{fontWeight: 900, fontSize: 11, width:"100%", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", padding:"0 4px", color: m.status === "active" ? "var(--text)" : m.status === "fault" ? "var(--red)" : "var(--amber)"}} title={safeStr(m.name)}>{safeStr(m.name)}</div>
+         <div style={{fontSize: 8, marginTop: 2, fontWeight: 700, color: m.status === "active" ? "var(--dim)" : "#fff"}}>
+           {m.status === "active" ? "ÇALIŞIYOR" : (stopReason || "DURDU")}
+         </div>
+      </div>
+    );
+  }
+
   return (
-    <div key={m.id} className={`card ${m.status === 'fault' ? 'pulse-fault' : m.status === 'stopped' ? 'pulse-stopped' : ''} clickable-card`}
-         style={{
-           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-           height: "55px", textAlign: "center", padding: "4px",
-           background: m.status === "active" ? "rgba(16,185,129,0.05)" : m.status === "fault" ? "rgba(239,68,68,0.15)" : "rgba(245,158,11,0.15)",
-           border: `2px solid ${m.status === "active" ? "var(--border)" : m.status === "fault" ? "var(--red)" : "var(--amber)"}`,
-           position: "relative", overflow: "hidden"
-         }}
-         onClick={()=>setSelMacDetail({mac:m, cat:cat})}>
-       
-       <input type="checkbox" className="mac-check" style={{position:"absolute", top:2, right:2, width:12, height:12, margin:0}} checked={isChecked} onChange={(e)=>handleMacCheck(m, e.target.checked)} onClick={e=>e.stopPropagation()} title="Toplu Bakım için Seç" />
-       
-       <div style={{fontWeight: 900, fontSize: 11, width:"100%", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", padding:"0 4px", color: m.status === "active" ? "var(--text)" : m.status === "fault" ? "var(--red)" : "var(--amber)"}} title={safeStr(m.name)}>
-         {safeStr(m.name)}
-       </div>
+    <div key={m.id} className={`card ${m.status === 'fault' ? 'pulse-fault' : m.status === 'stopped' ? 'pulse-stopped' : ''}`} style={{borderColor: m.status==="fault"?"#ef444490":m.status==="stopped"?"#f59e0b90": isChecked ? "var(--blue)" : "var(--border)", cursor:"pointer"}} onClick={()=>setSelMacDetail({mac:m, cat:cat})}>
+      <input type="checkbox" className="mac-check" checked={isChecked} onChange={(e)=>handleMacCheck(m, e.target.checked)} onClick={e=>e.stopPropagation()} />
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", paddingRight: 30}}>
+        <div><div style={{fontWeight:800, fontSize:16}}>{safeStr(m.name)}</div><div style={{fontSize:11, color:"var(--dim)", marginTop:2}}>{safeStr(m.brand)} {safeStr(m.model)}</div></div>
+        <div style={{display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6}}>
+          <span className="badge" style={{background: m.status==="active"?"#10b98120":m.status==="fault"?"#ef444420":"#f59e0b20", color: m.status==="active"?"var(--green)":m.status==="fault"?"var(--red)":"var(--amber)"}}>{m.status === "active" ? "ÇALIŞIYOR" : m.status === "fault" ? "ARIZALI" : "DURDU"}</span>
+          <button className="btn btn-ghost btn-xs" onClick={(e)=>{e.stopPropagation(); checkPw(()=>setModal({type:"edit_machine", mac:m}));}}>Ayarlar</button>
+        </div>
+      </div>
+    </div>
+  );
+})}
        
       <div style={{fontSize: 8, marginTop: 2, fontWeight: 700, color: m.status === "active" ? "var(--dim)" : "#fff"}}>
   {m.status === "active" ? "ÇALIŞIYOR" : (stopReason || (m.status === "fault" ? "ARIZALI" : "DURDU"))}
