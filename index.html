@@ -83,16 +83,11 @@ tr:hover td{background:rgba(255,255,255,0.03);}
 const { useState, useEffect, useMemo } = React;
 
 // ⚠️ BURAYA KENDİ DAĞITIM URL'NİZİ YAPIŞTIRIN!
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxoLwLdcSavvJjjtf7S-wtQQWGZJPCME2aXVHhG4hszqhIWufvmFaShEBzIIuEFuIg/exec";
-
-// ========================================================
-// MESAİ SAATLERİ VE GÜNLERİ (5 Gün - 08:00 / 17:30)
-// ========================================================
-const GLOBAL_SHIFT_START = "08:00";
-const GLOBAL_SHIFT_END = "17:30";
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz6SLmqw-gyU0Ay5rnAwez7sqdL0B-3aZI2AbE8fMYJpJhfqLeh4N_QdKcFHLEeoQxl/exec";
 
 // --- MESAİ İÇİ DURUŞ HESAPLAMA MOTORU (HAFTASONU HARİÇ) ---
-const calcShiftDowntime = (startStr, endStr, shiftStart = GLOBAL_SHIFT_START, shiftEnd = GLOBAL_SHIFT_END) => {
+// Not: Saatler artık sabit değil, ayarlardan gelen dinamik verilerle (shiftStart, shiftEnd) hesaplanır.
+const calcShiftDowntime = (startStr, endStr, shiftStart = "08:00", shiftEnd = "17:30") => {
   const start = new Date(startStr);
   const end = new Date(endStr);
   if (isNaN(start) || isNaN(end) || start >= end) return 0;
@@ -163,6 +158,9 @@ const safeArr = (v) => Array.isArray(v) ? v : [];
 const safeObj = (v) => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
 const safeStr = (v) => (v === null || v === undefined) ? "" : String(v);
 
+// Arayüzde kirlilik yaratmaması için teknik etiketleri gizleyen yardımcı fonksiyon
+const cleanTag = (str) => safeStr(str).replace(/\[MAKİNE DURDU\]\n?/g, "").replace(/\[ÇALIŞIYOR\]\n?/g, "");
+
 const InfoBtn = ({ msg }) => (
   <span className="info-icon" title={msg} onClick={e => e.stopPropagation()}>?</span>
 );
@@ -185,6 +183,44 @@ class ErrorBoundary extends React.Component {
     return this.props.children; 
   }
 }
+
+// --- SİSTEM AYARLARI MODALI (YENİ EKLENDİ) ---
+const SettingsModal = ({ settings, onClose, onSave }) => {
+  const [sStart, setSStart] = useState(settings.shiftStart);
+  const [sEnd, setSEnd] = useState(settings.shiftEnd);
+
+  const handleSave = () => {
+    if(!sStart || !sEnd) return alert("Saatler boş bırakılamaz!");
+    onSave({ shiftStart: sStart, shiftEnd: sEnd });
+    onClose();
+  };
+
+  return (
+    <div className="overlay" onClick={onClose} style={{zIndex:5000}}>
+      <div className="card mbody" onClick={e=>e.stopPropagation()} style={{maxWidth:400}}>
+        <ErrorBoundary>
+          <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:15}}>
+            <h3 style={{color:"var(--blue)"}}>Sistem Ayarları</h3>
+            <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+          </div>
+          <div style={{display:"flex", flexDirection:"column", gap:12}}>
+            <div style={{background:"var(--inp)", padding:15, borderRadius:8, border:"1px solid var(--border)"}}>
+                <div className="lbl" style={{color:"var(--amber)", marginBottom:10}}>VARDİYA / MESAİ SAATLERİ</div>
+                <div className="grid-2">
+                  <div><label className="lbl">Mesai Başlangıç</label><input type="time" className="inp" value={sStart} onChange={e=>setSStart(e.target.value)} /></div>
+                  <div><label className="lbl">Mesai Bitiş</label><input type="time" className="inp" value={sEnd} onChange={e=>setSEnd(e.target.value)} /></div>
+                </div>
+                <p style={{fontSize:11, color:"var(--mute)", marginTop:10, lineHeight:1.4}}>
+                  * Duruş süreleri (dakika) hesaplanırken, gece ve haftasonu saatleri çöpe atılır. Sadece burada belirlediğiniz mesai saatleri arasındaki zaman dikkate alınır.
+                </p>
+            </div>
+            <button className="btn btn-blue" style={{justifyContent:"center", padding:12}} onClick={handleSave}>💾 Ayarları Kaydet</button>
+          </div>
+        </ErrorBoundary>
+      </div>
+    </div>
+  );
+};
 
 // --- LİDERLİK TABLOSU ---
 const LeaderboardModal = ({ type, data, filtMonth, onClose, onSelectMac }) => {
@@ -282,10 +318,21 @@ function ConfirmModal({ msg, onYes, onNo }) {
 }
 
 // --- DÜZENLEME MODALI ---
-const RecordDetailModal = ({ record, type, macName, onClose, sendData, checkPw }) => {
+const RecordDetailModal = ({ record, type, macName, onClose, sendData, checkPw, settings }) => {
   const [isEdit, setIsEdit] = useState(false);
+  
+  // Eski kayıtlarda etiket yoksa arızanın duruş yarattığını varsay
+  const isOriginallyWorking = safeStr(record.desc).includes("[ÇALIŞIYOR]");
+  const [isMachineStopped, setIsMachineStopped] = useState(
+      record.type === 'durus' || (record.type === 'ariza' && !isOriginallyWorking)
+  );
+
+  // YENİ: Geçmişe dönük saat düzeltme state'leri
+  const [editStart, setEditStart] = useState(record.start ? toDTL(record.start) : "");
+  const [editEnd, setEditEnd] = useState(record.end ? toDTL(record.end) : "");
+  
   const [reason, setReason] = useState(record.reason || "");
-  const [desc, setDesc] = useState(record.desc || "");
+  const [desc, setDesc] = useState(cleanTag(record.desc));
   const [downtime, setDowntime] = useState(record.downtime || 0);
   const [closedBy, setClosedBy] = useState(record.closedBy || "");
   const [closeNote, setCloseNote] = useState(record.closeNote || "");
@@ -302,7 +349,12 @@ const RecordDetailModal = ({ record, type, macName, onClose, sendData, checkPw }
 
     let success = false;
     if(type === "fault") {
-      success = await sendData("update_fault", { id: record.id, reason, desc, downtime, closedBy, closeNote, materials });
+      let finalDesc = desc;
+      if (record.type === "ariza") {
+          finalDesc = (isMachineStopped ? "[MAKİNE DURDU]\n" : "[ÇALIŞIYOR]\n") + desc;
+      }
+      // EditStart ve EditEnd'i de gönderiyoruz (Eğer backend bunları algılıyorsa işler).
+      success = await sendData("update_fault", { id: record.id, reason, desc: finalDesc, downtime, closedBy, closeNote, materials, start: editStart, end: editEnd });
     } else {
       success = await sendData("update_maint", { id: record.id, person, notes, checks });
     }
@@ -327,13 +379,18 @@ const RecordDetailModal = ({ record, type, macName, onClose, sendData, checkPw }
                   <>
                     <div className="grid-2">
                       <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">BİLDİREN <InfoBtn msg="Arızayı/duruşu sisteme giren operatör veya personel." /></div><div style={{fontWeight:600}}>{safeStr(record.by)}</div></div>
-                      <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">KAPATAN <InfoBtn msg="Arızayı onarıp sistemi tekrar devreye alan bakım personeli." /></div><div style={{fontWeight:600}}>{safeStr(record.closedBy)}</div></div>
+                      <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">KAPATAN <InfoBtn msg="Arızayı onarıp sistemi tekrar devreye alan bakım personeli." /></div><div style={{fontWeight:600}}>{safeStr(record.closedBy) || "—"}</div></div>
                     </div>
+                    <div className="grid-2">
+                      <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">AÇILIŞ (BİLDİRİM) ZAMANI</div><div style={{fontWeight:600}}>{fd(record.start)}</div></div>
+                      <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">KAPANIŞ ZAMANI</div><div style={{fontWeight:600, color:record.status==="closed"?"var(--green)":"var(--amber)"}}>{record.status === "closed" ? fd(record.end) : "Açık / Devam Ediyor"}</div></div>
+                    </div>
+                    
                     <div style={{background:"var(--inp)", padding:12, borderRadius:8}}>
                       <div className="lbl">DURUŞ SEBEBİ & TİPİ <InfoBtn msg="Sisteme girilen ana duruş kategorisi." /></div>
                       <div style={{fontWeight:700, color:"var(--amber)", fontSize:14}}>{safeStr(record.reason)} <span style={{fontSize:12, color:"var(--mute)"}}>({safeStr(record.type || "Bilinmiyor").toUpperCase()})</span></div>
                     </div>
-                    <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">BİLDİRİM AÇIKLAMASI <InfoBtn msg="Operatörün arıza anında düştüğü not." /></div><div style={{color:"var(--text)"}}>{safeStr(record.desc)}</div></div>
+                    <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">BİLDİRİM AÇIKLAMASI <InfoBtn msg="Operatörün arıza anında düştüğü not." /></div><div style={{color:"var(--text)"}}>{cleanTag(record.desc)}</div></div>
                     <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">YAPILAN İŞLEM NOTU <InfoBtn msg="Bakım ekibinin sorunu nasıl çözdüğüne dair girdiği not." /></div><div style={{color:"var(--green)"}}>{safeStr(record.closeNote)}</div></div>
                     <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">DEĞİŞEN PARÇA / MALZEME <InfoBtn msg="Tamir esnasında yenisiyle değiştirilen parçalar." /></div><div style={{color:"var(--amber)", fontWeight:"bold"}}>{safeStr(record.materials) || "Kullanılmadı"}</div></div>
                     <div style={{background:"var(--inp)", padding:12, borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
@@ -366,10 +423,36 @@ const RecordDetailModal = ({ record, type, macName, onClose, sendData, checkPw }
                 {type === "fault" ? (
                   <>
                     <div><label className="lbl">Duruş Sebebi <InfoBtn msg="Arızanın türünü değiştirir." /></label><input className="inp" value={reason} onChange={e=>setReason(e.target.value)} /></div>
+                    
+                    {record.type === "ariza" && (
+                        <div style={{background:"var(--bg)", padding:10, borderRadius:8, border:"1px solid var(--border)", display:"flex", alignItems:"center", gap:10}}>
+                            <input type="checkbox" id="chkStopEdit" checked={isMachineStopped} onChange={e=>setIsMachineStopped(e.target.checked)} style={{width:18, height:18, cursor:"pointer"}} />
+                            <label className="lbl" htmlFor="chkStopEdit" style={{marginBottom:0, cursor:"pointer"}}>Bu arıza makineyi durdurdu (Geçmişe Yönelik Etkiler)</label>
+                        </div>
+                    )}
+                    
+                    {/* YENİ EKLENDİ: Saat Düzenleme ve Otomatik Duruş Hesaplama */}
+                    <div className="grid-2">
+                        <div>
+                           <label className="lbl">Açılış Zamanı <InfoBtn msg="Tarihi değiştirirseniz, duruş süresi otomatik hesaplanır." /></label>
+                           <input type="datetime-local" className="inp" value={editStart} onChange={e=>{ 
+                               setEditStart(e.target.value); 
+                               if(editEnd && e.target.value) setDowntime(calcShiftDowntime(e.target.value, editEnd, settings.shiftStart, settings.shiftEnd)); 
+                           }} />
+                        </div>
+                        <div>
+                           <label className="lbl">Kapanış Zamanı <InfoBtn msg="Tarihi değiştirirseniz, duruş süresi otomatik hesaplanır." /></label>
+                           <input type="datetime-local" className="inp" value={editEnd} onChange={e=>{ 
+                               setEditEnd(e.target.value); 
+                               if(editStart && e.target.value) setDowntime(calcShiftDowntime(editStart, e.target.value, settings.shiftStart, settings.shiftEnd)); 
+                           }} />
+                        </div>
+                    </div>
+
                     <div><label className="lbl">Bildirim Açıklaması</label><textarea className="inp" style={{minHeight:50}} value={desc} onChange={e=>setDesc(e.target.value)} /></div>
                     <div className="grid-2">
                       <div><label className="lbl">Kapatan Bakımcı</label><input className="inp" value={closedBy} onChange={e=>setClosedBy(e.target.value)} /></div>
-                      <div><label className="lbl">Duruş Süresi (Dakika) <InfoBtn msg="Eksi değer girilemez." /></label><input type="number" min="0" className="inp" value={downtime} onChange={e=>setDowntime(e.target.value)} /></div>
+                      <div><label className="lbl">Duruş Süresi (Dakika) <InfoBtn msg="Saatler değiştiğinde otomatik hesaplanır, ancak isterseniz manuel de yazabilirsiniz." /></label><input type="number" min="0" className="inp" value={downtime} onChange={e=>setDowntime(e.target.value)} /></div>
                     </div>
                     <div><label className="lbl">Yapılan İşlem Notu</label><textarea className="inp" style={{minHeight:50}} value={closeNote} onChange={e=>setCloseNote(e.target.value)} /></div>
                     <div><label className="lbl">Değişen Parça / Malzeme</label><textarea className="inp" style={{minHeight:50}} value={materials} onChange={e=>setMaterials(e.target.value)} /></div>
@@ -427,7 +510,7 @@ const BulkMaintModal = ({ selectedMacs, data, onClose, sendData }) => {
 
   const handleBulkSubmit = async () => {
     if(!tplKey || !person) return alert("Şablon ve Yapan Kişi zorunludur!");
-    if(!formDate) return alert("HATA: Tarih ve saat alanı boş bırakılamaz!"); // YENİ: BOŞ TARİH KORUMASI
+    if(!formDate) return alert("HATA: Tarih ve saat alanı boş bırakılamaz!");
     if (new Date(formDate) > new Date()) return alert("HATA: Gelecek bir tarih/saat seçemezsiniz!");
 
     setProgress(1);
@@ -659,15 +742,7 @@ const MachineManagerModal = ({ mac, categories, onClose, sendData }) => {
                   <div><label className="lbl">Marka</label><input className="inp" value={form.brand} onChange={e=>setForm({...form, brand: e.target.value})} /></div>
                   <div><label className="lbl">Model</label><input className="inp" value={form.model} onChange={e=>setForm({...form, model: e.target.value})} /></div>
                 </div>
-                {isEdit && (
-                  <div><label className="lbl">Manuel Durum Değişimi <InfoBtn msg="Makinenin durumunu el ile değiştirmek isterseniz kullanın." /></label>
-                    <select className="inp" value={form.status} onChange={e=>setForm({...form, status:e.target.value})}>
-                      <option value="active">Çalışıyor (Active)</option>
-                      <option value="stopped">Duruşta (Stopped)</option>
-                      <option value="fault">Arızalı (Fault)</option>
-                    </select>
-                  </div>
-                )}
+                {/* MANUEL DURUM DEĞİŞİMİ ALANI İPTAL EDİLMİŞTİR */}
                 <div className="grid-2" style={{marginTop:10}}>
                   <button className="btn btn-blue" style={{justifyContent:"center"}} onClick={handleSave}>💾 Kaydet</button>
                   {isEdit && <button className="btn btn-dng" style={{justifyContent:"center"}} onClick={()=>setConfirmDel(true)}>🗑 Makineyi Sil</button>}
@@ -714,16 +789,16 @@ const MachineManagerModal = ({ mac, categories, onClose, sendData }) => {
 };
 
 // --- MÜDAHALE (KAPATMA) MODALI ---
-const RepairModal = ({ repTgt, onClose, sendData }) => {
+const RepairModal = ({ repTgt, onClose, sendData, settings }) => {
   const [by, setBy] = useState("");
   const [note, setNote] = useState("");
   const [parts, setParts] = useState("");
   const [formDate, setFormDate] = useState(toDTL(new Date()));
-  const [isSubmitting, setIsSubmitting] = useState(false); // YENİ: Buton kilidi
+  const [isSubmitting, setIsSubmitting] = useState(false); 
 
   const handle = async () => {
     if(!by || !note) return alert("İsim ve işlem zorunludur!");
-    if(!formDate) return alert("HATA: Tarih ve saat alanı boş bırakılamaz!"); // YENİ EKLENDİ
+    if(!formDate) return alert("HATA: Tarih ve saat alanı boş bırakılamaz!"); 
     
     const endDt = new Date(formDate);
     if (endDt > new Date()) return alert("HATA: Henüz yaşanmamış ileri bir tarih veya saat seçemezsiniz!");
@@ -734,8 +809,9 @@ const RepairModal = ({ repTgt, onClose, sendData }) => {
     
     if (endDt < startDt) return alert("HATA: Arızayı kapatma zamanı, arızanın başladığı zamandan (" + fd(repTgt?.start) + ") daha eski olamaz!");
 
-    setIsSubmitting(true); // YENİ: Kayıt başladı, kilitle
-    const calculatedDowntime = calcShiftDowntime(startStr, formDate, GLOBAL_SHIFT_START, GLOBAL_SHIFT_END);
+    setIsSubmitting(true); 
+    // Ayarlardan gelen mesai saatlerine göre hesaplar
+    const calculatedDowntime = calcShiftDowntime(startStr, formDate, settings.shiftStart, settings.shiftEnd);
 
     const success = await sendData("close_fault", { 
       id: repTgt.id, 
@@ -745,7 +821,7 @@ const RepairModal = ({ repTgt, onClose, sendData }) => {
       customDate: formDate, 
       downtime: calculatedDowntime 
     });
-    setIsSubmitting(false); // YENİ: Kayıt bitti, kilidi aç
+    setIsSubmitting(false); 
     if(success) onClose();
   };
   return (
@@ -759,7 +835,7 @@ const RepairModal = ({ repTgt, onClose, sendData }) => {
             </div>
             <div style={{background:"var(--inp)", padding:12, borderRadius:8, marginBottom:15, border:"1px solid var(--border)"}}>
               <strong style={{color:"var(--amber)", fontSize:14}}>[{safeStr(repTgt?.reason)}]</strong>
-              <p style={{fontSize:13, marginTop:6, color:"var(--text)"}}>{safeStr(repTgt?.desc)}</p>
+              <p style={{fontSize:13, marginTop:6, color:"var(--text)"}}>{cleanTag(repTgt?.desc)}</p>
               <div style={{fontSize:11, color:"var(--dim)", marginTop:8}}>Başlangıç: {fd(repTgt?.start)}</div>
             </div>
             <div style={{display:"flex", flexDirection:"column", gap:12}}>
@@ -779,7 +855,7 @@ const RepairModal = ({ repTgt, onClose, sendData }) => {
 };
 
 // --- MAKİNE DETAY & ANALİZ MODALI ---
-const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw }) => {
+const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw, settings }) => {
   const [tab, setTab] = useState("summary"); 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -848,25 +924,25 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw }) => {
         let fEnd = (f.status === "closed" && f.end) ? safeTime(f.end) : now.getTime();
         
         if (fStart > 0 && fEnd > fStart) {
-           downTotal += f.status === "closed" ? (Number(f.downtime) || 0) : calcShiftDowntime(fStart, fEnd, GLOBAL_SHIFT_START, GLOBAL_SHIFT_END);
+           downTotal += f.status === "closed" ? (Number(f.downtime) || 0) : calcShiftDowntime(fStart, fEnd, settings.shiftStart, settings.shiftEnd);
            
            const overlapTodayStart = Math.max(fStart, todayStart);
            const overlapTodayEnd = Math.min(fEnd, todayEnd);
            if (overlapTodayEnd > overlapTodayStart) {
-             downToday += calcShiftDowntime(overlapTodayStart, overlapTodayEnd, GLOBAL_SHIFT_START, GLOBAL_SHIFT_END);
+             downToday += calcShiftDowntime(overlapTodayStart, overlapTodayEnd, settings.shiftStart, settings.shiftEnd);
            }
 
            const overlapMonthStart = Math.max(fStart, monthStart);
            const overlapMonthEnd = Math.min(fEnd, monthEnd);
            if (overlapMonthEnd > overlapMonthStart) {
-             downMonth += calcShiftDowntime(overlapMonthStart, overlapMonthEnd, GLOBAL_SHIFT_START, GLOBAL_SHIFT_END);
+             downMonth += calcShiftDowntime(overlapMonthStart, overlapMonthEnd, settings.shiftStart, settings.shiftEnd);
            }
         }
       }
     });
 
     return { downToday: Math.round(downToday), downMonth: Math.round(downMonth), downTotal: Math.round(downTotal) };
-  }, [mac?.id, data.faults]);
+  }, [mac?.id, data.faults, settings]);
 
   const trackers = useMemo(() => {
     const hasCustomTpl = mac?.templates && Object.keys(safeObj(mac.templates)).length > 0;
@@ -940,7 +1016,7 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw }) => {
 
             {tab === "summary" && (
               <div style={{display:"flex", flexDirection:"column", gap:16}}>
-                <div className="lbl" style={{color:"var(--mute)", marginTop:10}}>TÜM ZAMANLAR (Filtresiz) - Mesai: {GLOBAL_SHIFT_START} / {GLOBAL_SHIFT_END}</div>
+                <div className="lbl" style={{color:"var(--mute)", marginTop:10}}>TÜM ZAMANLAR (Filtresiz) - Mesai: {settings.shiftStart} / {settings.shiftEnd}</div>
                 <div className="grid-3">
                   <div className="card" style={{padding:12, textAlign:"center", background:"var(--inp)"}}>
                     <div className="lbl" style={{justifyContent:"center"}}>BUGÜN NET DURUŞ <InfoBtn msg="Bugün içinde makinenin duruşta geçirdiği net dakika. Gece ve haftasonu sayılmaz." /></div>
@@ -1018,13 +1094,18 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw }) => {
                   <div className="lbl" style={{color:"var(--red)"}}>Arıza & Duruş Listesi (Detay için tıkla) <InfoBtn msg="Makinenin geçmişte yaşadığı tüm arıza ve duruşların listesi. Tıklayarak rapor detayına ulaşabilirsiniz." /></div>
                   <div style={{maxHeight:200, overflowY:"auto", border:"1px solid var(--border)", borderRadius:8, marginBottom:16}}>
                     <table>
-                      <thead style={{background:"var(--inp)", position:"sticky", top:0}}><tr><th>Tip</th><th>Sebep</th><th>Tarih</th><th>Dk</th></tr></thead>
+                     <thead style={{background:"var(--inp)", position:"sticky", top:0}}><tr><th>Tip</th><th>Sebep</th><th>Tarih</th><th>Kapatan</th><th>İşlem</th><th>Dk</th></tr></thead>
                       <tbody>
-                        {filteredFaults.length === 0 && <tr><td colSpan="4" style={{textAlign:"center", color:"var(--dim)"}}>Kayıt yok</td></tr>}
+                        {filteredFaults.length === 0 && <tr><td colSpan="6" style={{textAlign:"center", color:"var(--dim)"}}>Kayıt yok</td></tr>}
                         {filteredFaults.map(f => (
-                          <tr key={f.id} className="clickable-row" onClick={() => setSelRecord({type: "fault", data: f})}>
-                            <td>{f.type==="ariza"?"🔴":"🟠"}</td><td style={{fontWeight:600}}>{safeStr(f.reason)}</td><td>{fd(f.start, true)}</td><td style={{color:"var(--red)", fontWeight:700}}>{f.status==="closed" && f.type!=="bakim" ? safeStr(f.downtime) : "—"}</td>
-                          </tr>
+                         <tr key={f.id} className="clickable-row" onClick={() => setSelRecord({type: "fault", data: f})}>
+                           <td>{f.type==="ariza"?"🔴":"🟠"}</td>
+                           <td style={{fontWeight:600}}>{safeStr(f.reason)}</td>
+                           <td>{fd(f.start, true)}</td>
+                           <td>{safeStr(f.closedBy) || "—"}</td>
+                           <td title={safeStr(f.closeNote)}>{safeStr(f.closeNote).substring(0, 15)}{safeStr(f.closeNote).length > 15 ? "..." : ""}</td>
+                           <td style={{color:"var(--red)", fontWeight:700}}>{f.status==="closed" && f.type!=="bakim" ? safeStr(f.downtime) : "—"}</td>
+                         </tr>
                         ))}
                       </tbody>
                     </table>
@@ -1103,7 +1184,7 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw }) => {
               </div>
             )}
 
-            {selRecord && <RecordDetailModal record={selRecord.data} type={selRecord.type} macName={mac?.name} onClose={()=>setSelRecord(null)} sendData={sendData} checkPw={checkPw} />}
+            {selRecord && <RecordDetailModal record={selRecord.data} type={selRecord.type} macName={mac?.name} onClose={()=>setSelRecord(null)} sendData={sendData} checkPw={checkPw} settings={settings} />}
           </React.Fragment>
         </ErrorBoundary>
       </div>
@@ -1150,7 +1231,7 @@ const QRPage = ({ data, setPg }) => {
 };
 
 // --- DASHBOARD (YÖNETİCİ EKRANI) ---
-const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData }) => {
+const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, settings }) => {
   const [tab, setTab] = useState("overview"); 
   const [selMacDetail, setSelMacDetail] = useState(null);
   
@@ -1306,7 +1387,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData }
         if (!f) return;
         const mac = safeArr(data.machines).find(m => m && m.id === f.macId) || {};
         const cat = safeArr(data.categories).find(c => c && c.id === mac.catId) || {};
-        const row = [f.id, mac.name || "Silinmiş", cat.name || "Silinmiş", f.type, f.status, f.reason, f.desc, f.start ? toDTL(f.start).replace('T', ' ') : "", f.end ? toDTL(f.end).replace('T', ' ') : "", f.downtime || 0, f.by, f.closedBy, f.closeNote, f.materials].map(escapeField).join(",");
+        const row = [f.id, mac.name || "Silinmiş", cat.name || "Silinmiş", f.type, f.status, f.reason, cleanTag(f.desc), f.start ? toDTL(f.start).replace('T', ' ') : "", f.end ? toDTL(f.end).replace('T', ' ') : "", f.downtime || 0, f.by, f.closedBy, f.closeNote, f.materials].map(escapeField).join(",");
         csvContent += row + "\n";
       });
     } else if (type === 'maint') {
@@ -1344,8 +1425,9 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData }
         <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
           <button className="btn btn-amber" onClick={() => setPg("qr")}>🔳 QR & Barkod</button>
           <button className="btn btn-ghost" onClick={() => setPg("mob")}>📱 Saha Uygulaması</button>
+          <button className="btn btn-ghost" onClick={() => checkPw(() => setModal({type:"settings"}))}>⚙️ Ayarlar</button>
           <button className="btn btn-blue" onClick={() => checkPw(() => setModal({type:"add_machine"}))}>+ Makine</button>
-          <button className="btn btn-purple" onClick={() => checkPw(() => setModal({type:"add_cat"}))}>⚙️ Kategoriler</button>
+          <button className="btn btn-purple" onClick={() => checkPw(() => setModal({type:"add_cat"}))}>📂 Kategoriler</button>
         </div>
       </div>
 
@@ -1477,7 +1559,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData }
                     <div>
                       <div style={{display:"flex", alignItems:"center", gap:8}}><span style={{fontWeight:800, fontSize:16}}>{safeStr(mac?.name)}</span><span className="badge" style={{background:"var(--inp)", color:"var(--dim)"}}>{safeStr(f.type).toUpperCase()}</span></div>
                       <div style={{fontSize:12, color:"var(--dim)", marginTop:4}}>Bildiren: <b style={{color:"var(--text)"}}>{safeStr(f.by)}</b> • Tarih: {fd(f.start)}</div>
-                      <div style={{fontSize:14, marginTop:8}}><span style={{fontWeight:800, color:f.type==="ariza"?"var(--red)":"var(--amber)"}}>[{safeStr(f.reason)}]</span> {safeStr(f.desc)}</div>
+                      <div style={{fontSize:14, marginTop:8}}><span style={{fontWeight:800, color:f.type==="ariza"?"var(--red)":"var(--amber)"}}>[{safeStr(f.reason)}]</span> {cleanTag(f.desc)}</div>
                     </div>
                     <button className="btn btn-green" onClick={()=>checkPw(() => setRepTgt(f))}>🔧 Kapat</button>
                   </div>
@@ -1556,7 +1638,6 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData }
                 <div style={{fontSize:24, fontWeight:900, marginTop:4, color:"var(--blue)"}}>{analytics.globalMttr} <span style={{fontSize:12}}>dk</span></div>
               </div>
               
-              {/* YENİ: YAĞ DEĞİŞİM PERİYODU KUTUSU */}
               <div className="card" style={{background:"var(--inp)", borderLeft:"3px solid #f97316"}}>
                 <div className="lbl">ORT. YAĞ DEĞİŞİM SÜRESİ <InfoBtn msg="Bu kategorideki makinelerin geçmişte 'Yağ' veya 'Oil' geçen bakımları arasında ortalama kaç gün geçtiğini gösterir."/></div>
                 <div style={{fontSize:18, fontWeight:800, marginTop:4, color:"#fdba74"}}>{analytics.avgOilDays ? `${analytics.avgOilDays} Gün` : "Veri Yok"}</div>
@@ -1608,9 +1689,8 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData }
          />
       )}
 
-      {/* HATA DÜZELTİLDİ: Toplu Bakım kapanınca ekran otomatik yenileniyor */}
       {showBulkModal && <BulkMaintModal selectedMacs={bulkMacs} data={data} sendData={sendData} onClose={() => {setShowBulkModal(false); setBulkMacs([]); fetchData(true);}} />}
-      {selMacDetail && <MachineDetailModal mac={selMacDetail.mac} cat={selMacDetail.cat} data={data} onClose={()=>setSelMacDetail(null)} sendData={sendData} checkPw={checkPw} />}
+      {selMacDetail && <MachineDetailModal mac={selMacDetail.mac} cat={selMacDetail.cat} data={data} onClose={()=>setSelMacDetail(null)} sendData={sendData} checkPw={checkPw} settings={settings} />}
     </div>
   );
 };
@@ -1629,6 +1709,9 @@ const Mobile = ({ data, setPg, sendData, initialMacId, setRepTgt }) => {
   const [consumedQr, setConsumedQr] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false); 
   const [isSubmitting, setIsSubmitting] = useState(false); 
+  
+  // YENİ EKLENDİ: Arıza makineyi durdurdu mu durumu
+  const [isMachineStopped, setIsMachineStopped] = useState(true);
 
   useEffect(() => {
     if(initialMacId && safeArr(data.machines).length > 0 && !consumedQr) {
@@ -1666,13 +1749,19 @@ const Mobile = ({ data, setPg, sendData, initialMacId, setRepTgt }) => {
       if(success) { setIsSuccess(true); } 
       return;
     }
+    
     if(!desc || !reason) { setIsSubmitting(false); return alert("Sebep ve Açıklama zorunludur!"); }
-    const success = await sendData("report_fault", { id: "FLT-"+uid(), machineId: selMac.id, type, reason: reason, desc, reportedBy: by, customDate: isoDate });
+    
+    let finalDesc = desc;
+    if (type === "ariza") {
+        finalDesc = (isMachineStopped ? "[MAKİNE DURDU]\n" : "[ÇALIŞIYOR]\n") + desc;
+    }
+
+    const success = await sendData("report_fault", { id: "FLT-"+uid(), machineId: selMac.id, type, reason: reason, desc: finalDesc, reportedBy: by, customDate: isoDate });
     setIsSubmitting(false); 
     if(success) { setIsSuccess(true); } 
   };
 
-  // YENİ: MOBİL BAŞARI EKRANI
   if (isSuccess) {
       return (
           <div style={{maxWidth:450, margin:"0 auto", padding:16}}>
@@ -1735,8 +1824,8 @@ const Mobile = ({ data, setPg, sendData, initialMacId, setRepTgt }) => {
           </div>
 
           <div className="tabs" style={{marginBottom:16}}>
-            <div className={`tab ${type==="durus"?"active":""}`} style={type==="durus"?{background:"var(--amber)",color:"#000"}:{}} onClick={()=>setType("durus")}>🟠 Duruş</div>
-            <div className={`tab ${type==="ariza"?"active":""}`} style={type==="ariza"?{background:"var(--red)",color:"#fff"}:{}} onClick={()=>setType("ariza")}>🔴 Arıza</div>
+            <div className={`tab ${type==="durus"?"active":""}`} style={type==="durus"?{background:"var(--amber)",color:"#000"}:{}} onClick={()=>{setType("durus"); setIsMachineStopped(true);}}>🟠 Duruş</div>
+            <div className={`tab ${type==="ariza"?"active":""}`} style={type==="ariza"?{background:"var(--red)",color:"#fff"}:{}} onClick={()=>{setType("ariza"); setIsMachineStopped(true);}}>🔴 Arıza</div>
             <div className={`tab ${type==="bakim"?"active":""}`} style={type==="bakim"?{background:"var(--green)",color:"#fff"}:{}} onClick={()=>setType("bakim")}>🟢 Bakım</div>
             <div className={`tab ${type==="open"?"active":""}`} style={type==="open"?{background:"var(--purple)",color:"#fff"}:{}} onClick={()=>setType("open")}>🔧 Açık İşler ({openFaults.length})</div>
           </div>
@@ -1749,7 +1838,7 @@ const Mobile = ({ data, setPg, sendData, initialMacId, setRepTgt }) => {
                  {openFaults.map(f => (
                    <div key={f.id} style={{padding:12, background:"var(--inp)", borderRadius:8, borderLeft: `4px solid ${f.type==="ariza"?"var(--red)":"var(--amber)"}`}}>
                       <div style={{fontSize:11, color:"var(--mute)", marginBottom:4}}>{fd(f.start)} • Bildiren: {safeStr(f.by)}</div>
-                      <div style={{fontSize:14, fontWeight:"bold", color:"var(--text)"}}><span style={{color:"var(--amber)"}}>[{safeStr(f.reason)}]</span> {safeStr(f.desc)}</div>
+                      <div style={{fontSize:14, fontWeight:"bold", color:"var(--text)"}}><span style={{color:"var(--amber)"}}>[{safeStr(f.reason)}]</span> {cleanTag(f.desc)}</div>
                       <button className="btn btn-green btn-sm" style={{width:"100%", marginTop:12, justifyContent:"center"}} onClick={() => setRepTgt(f)}>Müdahale Et & Kapat</button>
                    </div>
                  ))}
@@ -1761,6 +1850,14 @@ const Mobile = ({ data, setPg, sendData, initialMacId, setRepTgt }) => {
                     <div><label className="lbl">Kayıt Tarihi / Saati <InfoBtn msg="Geçmiş bir kayıt giriyorsanız tarihi değiştirebilirsiniz."/></label>
                       <input type="datetime-local" className="inp" value={formDate} onChange={e=>setFormDate(e.target.value)} />
                     </div>
+                    
+                    {type === "ariza" && (
+                      <div style={{background:"var(--bg)", padding:12, borderRadius:8, border:"1px solid var(--border)", display:"flex", alignItems:"center", gap:10}}>
+                          <input type="checkbox" id="chkStopRep" checked={isMachineStopped} onChange={e=>setIsMachineStopped(e.target.checked)} style={{width:20, height:20, cursor:"pointer"}} />
+                          <label htmlFor="chkStopRep" style={{fontWeight:700, cursor:"pointer", color:"var(--text)"}}>Bu arıza makineyi durdurdu</label>
+                      </div>
+                    )}
+                    
                     <div><label className="lbl">Sebep * <InfoBtn msg="Makinenin neden durduğunu seçin."/></label>
                       <select className="inp" value={reason} onChange={e=>setReason(e.target.value)}>
                         <option value="">-- Sebep Seçin --</option>
@@ -1832,6 +1929,20 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   
+  // YENİ: Sistem ayarlarına ulaşım ve tarayıcıya kaydetme
+  const [settings, setSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem("prox_settings");
+      return saved ? JSON.parse(saved) : { shiftStart: "08:00", shiftEnd: "17:30" };
+    } catch(e) { return { shiftStart: "08:00", shiftEnd: "17:30" }; }
+  });
+
+  const updateSettings = (newSet) => {
+    setSettings(newSet);
+    localStorage.setItem("prox_settings", JSON.stringify(newSet));
+    showToast("Ayarlar Kaydedildi!");
+  };
+  
   const urlParams = new URLSearchParams(window.location.search);
   const qrMacId = urlParams.get('mac');
   
@@ -1855,9 +1966,26 @@ function App() {
       .then(resp => {
         if(resp.result === "success") {
           const cats = safeArr(resp.data.categories).slice(1).map(r => ({ id: r[0], name: r[1], reasons: safeArr(parseJSON(r[2], [])), templates: safeObj(parseJSON(r[3], {})) }));
-          const macs = safeArr(resp.data.machines).slice(1).map(r => ({ id: r[0], catId: r[1], name: r[2], brand: r[3], model: r[4], status: r[5], templates: safeObj(parseJSON(r[6], {})) }));
+          let macs = safeArr(resp.data.machines).slice(1).map(r => ({ id: r[0], catId: r[1], name: r[2], brand: r[3], model: r[4], status: r[5], templates: safeObj(parseJSON(r[6], {})) }));
           const flts = safeArr(resp.data.faults).slice(1).map(r => ({ id: r[0], macId: r[1], type: r[2], reason: r[3], desc: r[4], by: r[5], start: r[6], status: r[7], closedBy: r[8], closeNote: r[9], materials: r[10], end: r[11], downtime: r[12] }));
           const mnts = safeArr(resp.data.maintenance).slice(1).map(r => ({ id: r[0], macId: r[1], type: r[2], by: r[3], date: r[4], checks: r[5], notes: r[6] }));
+          
+          macs = macs.map(m => {
+             const openF = flts.filter(f => f.macId === m.id && f.status === "open");
+             let isStopped = false, isFault = false;
+             openF.forEach(f => {
+                 if (f.type === "durus") isStopped = true;
+                 if (f.type === "ariza" && !String(f.desc).includes("[ÇALIŞIYOR]")) isFault = true;
+             });
+             
+             let realStatus = m.status; 
+             
+             if (isFault) realStatus = "fault"; 
+             else if (isStopped) realStatus = "stopped"; 
+             
+             return { ...m, status: realStatus };
+          });
+
           setData({ categories: cats, machines: macs, faults: flts, maintenance: mnts });
         }
         if(!silent) setLoading(false);
@@ -1889,16 +2017,17 @@ function App() {
         {toast && <div className="toast">{toast}</div>}
         {loading && <div className="loading"><div className="spinner"></div><div>Veriler Eşitleniyor...</div></div>}
         
-        {pg === "dash" && <Dash data={data} setPg={setPg} checkPw={checkPw} setModal={setModal} setRepTgt={setRepTgt} sendData={sendData} fetchData={fetchData} />}
+        {pg === "dash" && <Dash data={data} setPg={setPg} checkPw={checkPw} setModal={setModal} setRepTgt={setRepTgt} sendData={sendData} fetchData={fetchData} settings={settings} />}
         {pg === "mob" && <Mobile data={data} setPg={setPg} sendData={sendData} initialMacId={qrMacId} setRepTgt={setRepTgt} />}
         {pg === "qr" && <QRPage data={data} setPg={setPg} />}
         
+        {modal?.type === "settings" && <SettingsModal settings={settings} onClose={() => setModal(null)} onSave={updateSettings} />}
         {modal?.type === "add_cat" && <CategoryManagerModal onClose={() => setModal(null)} sendData={sendData} data={data} />}
         {modal?.type === "edit_cat" && <CategoryManagerModal cat={modal.cat} onClose={() => setModal(null)} sendData={sendData} data={data} />}
         {modal?.type === "add_machine" && <MachineManagerModal categories={data.categories} onClose={() => setModal(null)} sendData={sendData} data={data} />}
         {modal?.type === "edit_machine" && <MachineManagerModal mac={modal.mac} categories={data.categories} onClose={() => setModal(null)} sendData={sendData} data={data} />}
         
-        {repTgt && <RepairModal repTgt={repTgt} onClose={() => setRepTgt(null)} sendData={sendData} />}
+        {repTgt && <RepairModal repTgt={repTgt} onClose={() => setRepTgt(null)} sendData={sendData} settings={settings} />}
       </div>
     </ErrorBoundary>
   );
