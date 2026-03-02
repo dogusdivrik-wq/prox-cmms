@@ -1522,6 +1522,8 @@ const handleSelectAllCat = (catId, isSelect) => {
                     });
                     mTrackers.sort((a,b) => a.diffDays - b.diffDays);
                     const isChecked = bulkMacs.some(x => x.id === m.id);
+                    const activeF = data.faults.find(f => f.macId === m.id && f.status === "open");
+const stopReason = activeF ? safeStr(activeF.reason) : "";
 if (viewMode === "grid") {
   return (
     <div key={m.id} className={`card ${m.status === 'fault' ? 'pulse-fault' : m.status === 'stopped' ? 'pulse-stopped' : ''} clickable-card`}
@@ -1540,8 +1542,9 @@ if (viewMode === "grid") {
          {safeStr(m.name)}
        </div>
        
-       <div style={{fontSize: 8, color: "var(--dim)", marginTop: 2, fontWeight: 700}}>
-         {m.status === "active" ? "ÇALIŞIYOR" : m.status === "fault" ? "ARIZALI" : "DURDU"}
+      <div style={{fontSize: 8, marginTop: 2, fontWeight: 700, color: m.status === "active" ? "var(--dim)" : "#fff"}}>
+  {m.status === "active" ? "ÇALIŞIYOR" : (stopReason || (m.status === "fault" ? "ARIZALI" : "DURDU"))}
+</div>
        </div>
        
     </div>
