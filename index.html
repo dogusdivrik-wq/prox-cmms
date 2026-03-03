@@ -10,7 +10,7 @@
 :root{--bg:#0f172a;--card:#1e293b;--border:#334155;--inp:#0f172a;--text:#f8fafc;--dim:#94a3b8;--mute:#64748b;--amber:#f59e0b;--red:#ef4444;--green:#10b981;--blue:#3b82f6;--purple:#8b5cf6}
 body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
 ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px; position:relative;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px; position:relative; transition:all 0.2s ease;}
 .btn{padding:10px 16px;border:none;border-radius:8px;font-family:'Outfit',sans-serif;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s}
 .btn:active{transform:scale(.97)}
 .btn-amber{background:var(--amber);color:#000}.btn-red{background:var(--red);color:#fff}.btn-green{background:var(--green);color:#fff}.btn-blue{background:var(--blue);color:#fff}.btn-purple{background:var(--purple);color:#fff}
@@ -39,13 +39,16 @@ textarea.inp{resize:vertical;min-height:80px}
 .spinner{width:40px;height:40px;border:4px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin 1s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
 
+/* ANİMASYONLAR VE RENK EFEKTLERİ */
 @keyframes pulse-red { 0% {box-shadow: 0 0 0 0 rgba(239,68,68,0.4);} 70% {box-shadow: 0 0 0 10px rgba(239,68,68,0);} 100% {box-shadow: 0 0 0 0 rgba(239,68,68,0);} }
 @keyframes pulse-amber { 0% {box-shadow: 0 0 0 0 rgba(245,158,11,0.4);} 70% {box-shadow: 0 0 0 10px rgba(245,158,11,0);} 100% {box-shadow: 0 0 0 0 rgba(245,158,11,0);} }
-@keyframes pulse-special { 0% {box-shadow: 0 0 0 0 rgba(234,179,8,0.6);} 70% {box-shadow: 0 0 0 10px rgba(234,179,8,0);} 100% {box-shadow: 0 0 0 0 rgba(234,179,8,0);} }
+@keyframes pulse-special-pending { 0% {box-shadow: 0 0 0 0 rgba(234,179,8,0.2);} 70% {box-shadow: 0 0 0 6px rgba(234,179,8,0);} 100% {box-shadow: 0 0 0 0 rgba(234,179,8,0);} }
+@keyframes pulse-special-due { 0% {box-shadow: 0 0 0 0 rgba(234,179,8,0.7);} 50% {box-shadow: 0 0 0 12px rgba(234,179,8,0);} 100% {box-shadow: 0 0 0 0 rgba(234,179,8,0);} }
 
 .pulse-fault { animation: pulse-red 2s infinite; border-color: rgba(239,68,68,0.6) !important; }
 .pulse-stopped { animation: pulse-amber 2s infinite; border-color: rgba(245,158,11,0.6) !important; }
-.pulse-special { animation: pulse-special 2s infinite; border-color: rgba(234,179,8,0.8) !important; }
+.pulse-special-pending { animation: pulse-special-pending 3s infinite; border-color: rgba(234,179,8,0.5) !important; }
+.pulse-special-due { animation: pulse-special-due 1s infinite; border-color: #eab308 !important; }
 
 .mini-prog-bg { height: 6px; background: var(--inp); border-radius: 3px; overflow: hidden; margin-top: 4px; border:1px solid rgba(255,255,255,0.05);}
 .mini-prog-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
@@ -56,8 +59,8 @@ td{padding:12px 8px;border-bottom:1px solid var(--border);color:var(--text);}
 tr:hover td{background:rgba(255,255,255,0.03);}
 .clickable-row{cursor:pointer; transition:background 0.2s;}
 .clickable-row:hover{background:rgba(59, 130, 246, 0.1);}
-.clickable-card{cursor:pointer; transition:transform 0.2s ease, border-color 0.2s ease;}
-.clickable-card:hover{transform:scale(1.02); border-color:var(--dim);}
+.clickable-card{cursor:pointer; transition:transform 0.2s ease;}
+.clickable-card:hover{transform:scale(1.02); filter:brightness(1.1);}
 
 .prog-container{height:10px;background:var(--inp);border-radius:5px;overflow:hidden;margin-top:8px;border:1px solid var(--border);}
 .prog-fill{height:100%;border-radius:5px;transition:width 0.3s ease;}
@@ -102,7 +105,6 @@ const calcShiftDowntime = (startStr, endStr, shiftStart = "08:00", shiftEnd = "1
 
   while (current < end && loopLimit < 365) { 
     const dayOfWeek = current.getDay(); 
-    
     if (dayOfWeek !== 0 && dayOfWeek !== 6) {
       let dayShiftStart = new Date(current);
       dayShiftStart.setHours(sH, sM, 0, 0);
@@ -117,7 +119,6 @@ const calcShiftDowntime = (startStr, endStr, shiftStart = "08:00", shiftEnd = "1
         totalMinutes += (overlapEnd - overlapStart) / 60000;
       }
     }
-
     current.setDate(current.getDate() + 1);
     current.setHours(0, 0, 0, 0); 
     loopLimit++;
@@ -820,7 +821,6 @@ const RepairModal = ({ repTgt, onClose, sendData, settings }) => {
     if (endDt < startDt && repTgt?.type !== "is_emri") return alert("HATA: Kapatma zamanı, arızanın başladığı zamandan daha eski olamaz!");
 
     setIsSubmitting(true); 
-    // Ayarlardan gelen mesai saatlerine göre hesaplar
     const calculatedDowntime = repTgt?.type === "is_emri" ? 0 : calcShiftDowntime(startStr, formDate, settings.shiftStart, settings.shiftEnd);
 
     const success = await sendData("close_fault", { 
@@ -1533,14 +1533,19 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
                     mTrackers.sort((a,b) => a.diffDays - b.diffDays);
                     const isChecked = bulkMacs.some(x => x.id === m.id);
                     
-                    // --- YENİ EKLENEN İŞ EMRİ KONTROLÜ (SARI YANMA EFEKTİ) ---
+                    // --- DURUM VE ALARM MANTIĞI KONTROL MERKEZİ ---
                     const openTickets = safeArr(data.faults).filter(f => f.macId === m.id && f.status === "open");
-                    const activeF = openTickets.find(f => f.type !== "is_emri"); // Normal Arıza veya Duruş
+                    
+                    // Sadece makineyi GERÇEKTEN durduran arıza veya operasyonel duruşları bul (Eğer arızaysa ve [ÇALIŞIYOR] etiketi Varsa yoksay)
+                    const activeF = openTickets.find(f => f.type !== "is_emri" && !(f.type === "ariza" && String(f.desc).includes("[ÇALIŞIYOR]")));
+                    
+                    // Özel İş Emirleri (Tarihi gelmiş mi?)
                     const dueSpecialTask = openTickets.find(f => f.type === "is_emri" && new Date(f.start).getTime() <= todayMs);
+                    const pendingSpecialTask = openTickets.find(f => f.type === "is_emri" && new Date(f.start).getTime() > todayMs);
                     
-                    const stopReason = activeF ? safeStr(activeF.reason) : (dueSpecialTask ? "ÖZEL BAKIM ZAMANI" : "");
-                    
-                    // Dinamik sınıflandırma
+                    let stopReason = activeF ? safeStr(activeF.reason) : "";
+
+                    // Renk ve Stil Değişkenleri
                     let cardPulseClass = "";
                     let cardBorderColor = "var(--border)";
                     let cardBg = "rgba(16,185,129,0.05)";
@@ -1549,7 +1554,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
                     let badgeBg = "#10b98120";
                     let badgeColor = "var(--green)";
 
-                    if (m.status === 'fault') {
+                    if (m.status === 'fault') { // Makine kırmızıya düşmüşse (Gerçek Arıza)
                        cardPulseClass = 'pulse-fault';
                        cardBorderColor = 'var(--red)';
                        cardBg = 'rgba(239,68,68,0.15)';
@@ -1557,7 +1562,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
                        statusColor = 'var(--red)';
                        badgeBg = '#ef444420';
                        badgeColor = 'var(--red)';
-                    } else if (m.status === 'stopped') {
+                    } else if (m.status === 'stopped') { // Makine turuncuya düşmüşse (Operasyonel Duruş)
                        cardPulseClass = 'pulse-stopped';
                        cardBorderColor = 'var(--amber)';
                        cardBg = 'rgba(245,158,11,0.15)';
@@ -1565,17 +1570,34 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
                        statusColor = 'var(--amber)';
                        badgeBg = '#f59e0b20';
                        badgeColor = 'var(--amber)';
-                    } else if (dueSpecialTask) {
-                       cardPulseClass = 'pulse-special'; // Sarı yansın
+                    } else if (dueSpecialTask) { // Yeşil ama Özel Bakım Vakti Gelmiş (Hızlı Sarı Pulse)
+                       cardPulseClass = 'pulse-special-due';
                        cardBorderColor = '#eab308';
                        cardBg = 'rgba(234, 179, 8, 0.15)';
                        statusLabel = 'ÖZEL BAKIM ZAMANI';
                        statusColor = '#eab308';
                        badgeBg = '#eab30820';
                        badgeColor = '#eab308';
+                       stopReason = "ÖZEL BAKIM ZAMANI";
+                    } else if (pendingSpecialTask) { // Yeşil ama İleri Tarihli Özel Bakım Var (Yavaş Sarı Pulse)
+                       cardPulseClass = 'pulse-special-pending';
+                       cardBorderColor = 'rgba(234, 179, 8, 0.4)';
+                       cardBg = 'rgba(234, 179, 8, 0.05)';
+                       statusLabel = 'PLANLI İŞ EMRİ';
+                       statusColor = '#ca8a04';
+                       badgeBg = 'transparent';
+                       badgeColor = '#ca8a04';
+                       stopReason = "PLANLI İŞ EMRİ";
+                    } else { // Yemyeşil tıkır tıkır çalışıyor
+                       // Eğer çalışıyor ama "Arıza var fakat durdurmadı" dediyse (Checkbox kapalıysa)
+                       const nonStoppingFault = openTickets.find(f => f.type === "ariza" && String(f.desc).includes("[ÇALIŞIYOR]"));
+                       if (nonStoppingFault) {
+                          statusLabel = "ÇALIŞIYOR (KAYIT VAR)";
+                          statusColor = "var(--blue)";
+                          stopReason = "KAYIT VAR";
+                       }
                     }
 
-                    // KUŞBAKIŞI GÖRÜNÜM
                     if (viewMode === "grid") {
                       return (
                         <div key={m.id} className={`card ${cardPulseClass} clickable-card`}
@@ -1589,16 +1611,15 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
                              onClick={()=>setSelMacDetail({mac:m, cat:cat})}>
                            <input type="checkbox" className="mac-check" style={{position:"absolute", top:2, right:2, width:12, height:12, margin:0}} checked={isChecked} onChange={(e)=>handleMacCheck(m, e.target.checked)} onClick={e=>e.stopPropagation()} title="Toplu Bakım için Seç" />
                            <div style={{fontWeight: 900, fontSize: 11, width:"100%", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", padding:"0 4px", color: statusColor}} title={safeStr(m.name)}>{safeStr(m.name)}</div>
-                           <div style={{fontSize: 8, marginTop: 2, fontWeight: 700, color: (m.status === "active" && !dueSpecialTask) ? "var(--dim)" : "#fff"}}>
+                           <div style={{fontSize: 8, marginTop: 2, fontWeight: 700, color: (m.status === "active" && !dueSpecialTask && !pendingSpecialTask && statusLabel==="ÇALIŞIYOR") ? "var(--dim)" : statusColor}}>
                              {stopReason || statusLabel}
                            </div>
                         </div>
                       );
                     }
 
-                    // LİSTE GÖRÜNÜMÜ
                     return (
-                      <div key={m.id} className={`card ${cardPulseClass}`} style={{borderColor: (m.status!=="active" || dueSpecialTask) ? cardBorderColor : isChecked ? "var(--blue)" : "var(--border)", cursor:"pointer"}} onClick={()=>setSelMacDetail({mac:m, cat:cat})}>
+                      <div key={m.id} className={`card ${cardPulseClass}`} style={{borderColor: (m.status!=="active" || dueSpecialTask || pendingSpecialTask) ? cardBorderColor : isChecked ? "var(--blue)" : "var(--border)", cursor:"pointer", background: cardBg}} onClick={()=>setSelMacDetail({mac:m, cat:cat})}>
                         <input type="checkbox" className="mac-check" checked={isChecked} onChange={(e)=>handleMacCheck(m, e.target.checked)} onClick={e=>e.stopPropagation()} title="Toplu Bakım için Seç" />
                         <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", paddingRight: 30}}>
                           <div><div style={{fontWeight:800, fontSize:16}}>{safeStr(m.name)}</div><div style={{fontSize:11, color:"var(--dim)", marginTop:2}}>{safeStr(m.brand)} {safeStr(m.model)}</div></div>
@@ -1657,7 +1678,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
               const mac = safeArr(data.machines).find(m => m && m.id === f.macId);
               const isEmri = f.type === "is_emri";
               return (
-                <div key={f.id} className={`card ${f.type==='ariza'?'pulse-fault': isEmri ? 'pulse-special' : 'pulse-stopped'}`} style={{borderLeft: `4px solid ${f.type==="ariza"?"var(--red)":isEmri ? "#eab308" : "var(--amber)"}`}}>
+                <div key={f.id} className={`card ${f.type==='ariza'?'pulse-fault': isEmri ? 'pulse-special-due' : 'pulse-stopped'}`} style={{borderLeft: `4px solid ${f.type==="ariza"?"var(--red)":isEmri ? "#eab308" : "var(--amber)"}`}}>
                   <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:10}}>
                     <div>
                       <div style={{display:"flex", alignItems:"center", gap:8}}><span style={{fontWeight:800, fontSize:16}}>{safeStr(mac?.name)}</span><span className="badge" style={{background:"var(--inp)", color:isEmri ? "#eab308" :"var(--dim)"}}>{isEmri ? "ÖZEL İŞ EMRİ" : safeStr(f.type).toUpperCase()}</span></div>
@@ -2091,7 +2112,7 @@ function App() {
                  if (f.type === "ariza" && !String(f.desc).includes("[ÇALIŞIYOR]")) isFault = true;
              });
              
-             let realStatus = m.status; 
+             let realStatus = "active"; 
              
              if (isFault) realStatus = "fault"; 
              else if (isStopped) realStatus = "stopped"; 
