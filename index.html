@@ -1701,7 +1701,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
                              }}
                              onClick={()=>setSelMacDetail({mac:m, cat:cat})}>
                            <input type="checkbox" className="mac-check" style={{position:"absolute", top:2, right:2, width:12, height:12, margin:0}} checked={isChecked} onChange={(e)=>handleMacCheck(m, e.target.checked)} onClick={e=>e.stopPropagation()} title="Toplu Bakım için Seç" />
-                           <div style={{fontWeight: 900, fontSize: 11, width:"100%", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", padding:"0 4px", color: statusColor}}>{safeStr(m.name)}</div>
+                          <div style={{fontWeight: 900, fontSize: 10, width:"100%", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.1, padding:"0 2px", color: statusColor}}>{safeStr(m.name)}</div>
                            <div style={{fontSize: 8, marginTop: 2, fontWeight: 700, color: (m.status === "active" && !dueSpecialTask && !pendingSpecialTask && statusLabel==="ÇALIŞIYOR") ? "var(--dim)" : statusColor}}>
                              {stopReason || statusLabel}
                            </div>
