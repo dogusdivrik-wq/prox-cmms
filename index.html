@@ -39,16 +39,17 @@ textarea.inp{resize:vertical;min-height:80px}
 .spinner{width:40px;height:40px;border:4px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin 1s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
 
-/* ANİMASYONLAR VE RENK EFEKTLERİ */
+/* GÜNCELLENEN ANİMASYONLAR VE RENK EFEKTLERİ */
 @keyframes pulse-red { 0% {box-shadow: 0 0 0 0 rgba(239,68,68,0.4);} 70% {box-shadow: 0 0 0 10px rgba(239,68,68,0);} 100% {box-shadow: 0 0 0 0 rgba(239,68,68,0);} }
 @keyframes pulse-amber { 0% {box-shadow: 0 0 0 0 rgba(245,158,11,0.4);} 70% {box-shadow: 0 0 0 10px rgba(245,158,11,0);} 100% {box-shadow: 0 0 0 0 rgba(245,158,11,0);} }
-@keyframes pulse-special-pending { 0% {box-shadow: 0 0 0 0 rgba(234,179,8,0.2);} 70% {box-shadow: 0 0 0 6px rgba(234,179,8,0);} 100% {box-shadow: 0 0 0 0 rgba(234,179,8,0);} }
-@keyframes pulse-special-due { 0% {box-shadow: 0 0 0 0 rgba(234,179,8,0.7);} 50% {box-shadow: 0 0 0 12px rgba(234,179,8,0);} 100% {box-shadow: 0 0 0 0 rgba(234,179,8,0);} }
+@keyframes pulse-blue { 0% {box-shadow: 0 0 0 0 rgba(59,130,246,0.4);} 70% {box-shadow: 0 0 0 10px rgba(59,130,246,0);} 100% {box-shadow: 0 0 0 0 rgba(59,130,246,0);} }
+@keyframes pulse-special-due { 0% {box-shadow: 0 0 0 0 rgba(234,179,8,0.8);} 50% {box-shadow: 0 0 0 15px rgba(234,179,8,0);} 100% {box-shadow: 0 0 0 0 rgba(234,179,8,0);} }
 
 .pulse-fault { animation: pulse-red 2s infinite; border-color: rgba(239,68,68,0.6) !important; }
 .pulse-stopped { animation: pulse-amber 2s infinite; border-color: rgba(245,158,11,0.6) !important; }
-.pulse-special-pending { animation: pulse-special-pending 3s infinite; border-color: rgba(234,179,8,0.5) !important; }
+.pulse-blue { animation: pulse-blue 2s infinite; border-color: rgba(59,130,246,0.6) !important; }
 .pulse-special-due { animation: pulse-special-due 1s infinite; border-color: #eab308 !important; }
+.pulse-special-pending { border-color: rgba(234,179,8,0.4) !important; border-style: dashed !important; }
 
 .mini-prog-bg { height: 6px; background: var(--inp); border-radius: 3px; overflow: hidden; margin-top: 4px; border:1px solid rgba(255,255,255,0.05);}
 .mini-prog-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
@@ -91,7 +92,6 @@ const { useState, useEffect, useMemo } = React;
 // ⚠️ BURAYA KENDİ DAĞITIM URL'NİZİ YAPIŞTIRIN!
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz6SLmqw-gyU0Ay5rnAwez7sqdL0B-3aZI2AbE8fMYJpJhfqLeh4N_QdKcFHLEeoQxl/exec";
 
-// --- MESAİ İÇİ DURUŞ HESAPLAMA MOTORU (HAFTASONU HARİÇ) ---
 const calcShiftDowntime = (startStr, endStr, shiftStart = "08:00", shiftEnd = "17:30") => {
   const start = new Date(startStr);
   const end = new Date(endStr);
@@ -476,9 +476,9 @@ const RecordDetailModal = ({ record, type, macName, onClose, sendData, checkPw, 
   );
 };
 
-// --- YENİ EKLENEN: TOPLU BAKIM GİRİŞ MODALI (ÇOKLU SEÇİM) ---
+// --- TOPLU BAKIM GİRİŞ MODALI ---
 const BulkMaintModal = ({ selectedMacs, data, onClose, sendData }) => {
-  const [selTplKeys, setSelTplKeys] = useState([]); // Artık bir dizi (array) tutuyor
+  const [selTplKeys, setSelTplKeys] = useState([]);
   const [person, setPerson] = useState("");
   const [notes, setNotes] = useState("");
   const [formDate, setFormDate] = useState(toDTL(new Date()));
@@ -514,7 +514,6 @@ const BulkMaintModal = ({ selectedMacs, data, onClose, sendData }) => {
 
     setProgress(1);
     
-    // Her makine için, seçilen her şablonu gönder (İç içe döngü)
     for (let i = 0; i < selectedMacs.length; i++) {
       const m = selectedMacs[i];
       if(!m) continue;
@@ -559,7 +558,6 @@ const BulkMaintModal = ({ selectedMacs, data, onClose, sendData }) => {
                 
                 <div><label className="lbl">Uygulanacak Tarih / Saat <InfoBtn msg="Bakımın yapıldığı tarih. Tüm seçili makinelere bu tarih işlenir." /></label><input type="datetime-local" className="inp" value={formDate} onChange={e=>setFormDate(e.target.value)} /></div>
                 
-                {/* ÇOKLU SEÇİM KUTULARI */}
                 <div><label className="lbl">Uygulanacak Bakım Şablonları * (Birden fazla seçebilirsiniz) <InfoBtn msg="Seçili makinelerin TÜMÜNDE ortak olan bakım şablonları listelenir." /></label>
                   <div style={{display:"flex", flexDirection:"column", gap:6, background:"var(--inp)", padding:10, borderRadius:8, border:"1px solid var(--border)", maxHeight:150, overflowY:"auto"}}>
                     {availableTpls.map(([k, label]) => (
@@ -996,6 +994,9 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw, settin
     return Object.values(counts).sort((a,b) => b.count - a.count);
   }, [filteredFaults]);
 
+  // Aktif bldirimleri pencere açılınca en üstte göstermek için
+  const activeTickets = safeArr(data.faults).filter(f => f && f.macId === mac?.id && f.status === "open");
+
   return (
     <div className="overlay" onClick={onClose} style={{zIndex:2000}}>
       <div className="card mbody" onClick={e=>e.stopPropagation()} style={{maxWidth:750}}>
@@ -1026,7 +1027,24 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw, settin
 
             {tab === "summary" && (
               <div style={{display:"flex", flexDirection:"column", gap:16}}>
-                <div className="lbl" style={{color:"var(--mute)", marginTop:10}}>TÜM ZAMANLAR (Filtresiz) - Mesai: {settings.shiftStart} / {settings.shiftEnd}</div>
+                
+                {/* --- YENİ: AKTİF BİLDİRİMLER (ŞU AN) BÖLÜMÜ --- */}
+                {activeTickets.length > 0 && (
+                    <div style={{marginBottom: 10, marginTop: 10}}>
+                        <div className="lbl" style={{color:"var(--amber)"}}>🚨 AKTİF BİLDİRİMLER (ŞU AN)</div>
+                        <div style={{display:"flex", flexDirection:"column", gap:8}}>
+                           {activeTickets.map(t => (
+                               <div key={t.id} className="card" style={{background:"var(--inp)", borderLeft:`3px solid ${t.type==="is_emri"?"#eab308":t.type==="ariza"?"var(--red)":"var(--amber)"}`}}>
+                                  <div style={{fontWeight:"bold", color:"var(--text)", fontSize:14}}>[{safeStr(t.reason)}]</div>
+                                  <div style={{color:"var(--dim)", fontSize:13, marginTop:4}}>{cleanTag(t.desc)}</div>
+                                  <div style={{fontSize:11, color:"var(--mute)", marginTop:6}}>{t.type==="is_emri"?"Planlayan":"Bildiren"}: {safeStr(t.by)} | {fd(t.start)}</div>
+                               </div>
+                           ))}
+                        </div>
+                    </div>
+                )}
+
+                <div className="lbl" style={{color:"var(--mute)", marginTop:activeTickets.length>0?0:10}}>TÜM ZAMANLAR (Filtresiz) - Mesai: {settings.shiftStart} / {settings.shiftEnd}</div>
                 <div className="grid-3">
                   <div className="card" style={{padding:12, textAlign:"center", background:"var(--inp)"}}>
                     <div className="lbl" style={{justifyContent:"center"}}>BUGÜN NET DURUŞ <InfoBtn msg="Bugün içinde makinenin duruşta geçirdiği net dakika. Gece ve haftasonu sayılmaz." /></div>
@@ -1543,7 +1561,9 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
                     const dueSpecialTask = openTickets.find(f => f.type === "is_emri" && new Date(f.start).getTime() <= todayMs);
                     const pendingSpecialTask = openTickets.find(f => f.type === "is_emri" && new Date(f.start).getTime() > todayMs);
                     
+                    // Kutu üstünde görünecek sebep ve tooltip açıklaması
                     let stopReason = activeF ? safeStr(activeF.reason) : "";
+                    let openDesc = activeF ? cleanTag(activeF.desc) : ""; 
 
                     // Renk ve Stil Değişkenleri
                     let cardPulseClass = "";
@@ -1579,28 +1599,38 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
                        badgeBg = '#eab30820';
                        badgeColor = '#eab308';
                        stopReason = "ÖZEL BAKIM ZAMANI";
+                       openDesc = cleanTag(dueSpecialTask.desc);
                     } else if (pendingSpecialTask) { // Yeşil ama İleri Tarihli Özel Bakım Var (Yavaş Sarı Pulse)
                        cardPulseClass = 'pulse-special-pending';
-                       cardBorderColor = 'rgba(234, 179, 8, 0.4)';
+                       cardBorderColor = 'rgba(234, 179, 8, 0.6)';
                        cardBg = 'rgba(234, 179, 8, 0.05)';
                        statusLabel = 'PLANLI İŞ EMRİ';
                        statusColor = '#ca8a04';
                        badgeBg = 'transparent';
                        badgeColor = '#ca8a04';
                        stopReason = "PLANLI İŞ EMRİ";
+                       openDesc = cleanTag(pendingSpecialTask.desc);
                     } else { // Yemyeşil tıkır tıkır çalışıyor
                        // Eğer çalışıyor ama "Arıza var fakat durdurmadı" dediyse (Checkbox kapalıysa)
                        const nonStoppingFault = openTickets.find(f => f.type === "ariza" && String(f.desc).includes("[ÇALIŞIYOR]"));
                        if (nonStoppingFault) {
+                          cardPulseClass = 'pulse-blue'; // MAVİ YANIP SÖNSÜN (ÇALIŞIYOR AMA KAYIT VAR)
+                          cardBorderColor = 'var(--blue)';
+                          cardBg = 'rgba(59,130,246,0.1)';
                           statusLabel = "ÇALIŞIYOR (KAYIT VAR)";
                           statusColor = "var(--blue)";
-                          stopReason = "KAYIT VAR";
+                          badgeBg = "#3b82f620";
+                          badgeColor = "var(--blue)";
+                          stopReason = safeStr(nonStoppingFault.reason);
+                          openDesc = cleanTag(nonStoppingFault.desc);
                        }
                     }
 
+                    // KUŞBAKIŞI GÖRÜNÜM (Açıklama artık Tooltip'te var)
                     if (viewMode === "grid") {
                       return (
                         <div key={m.id} className={`card ${cardPulseClass} clickable-card`}
+                             title={openDesc ? `Mevcut Kayıt: ${openDesc}` : safeStr(m.name)}
                              style={{
                                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                                height: "55px", textAlign: "center", padding: "4px",
@@ -1610,7 +1640,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
                              }}
                              onClick={()=>setSelMacDetail({mac:m, cat:cat})}>
                            <input type="checkbox" className="mac-check" style={{position:"absolute", top:2, right:2, width:12, height:12, margin:0}} checked={isChecked} onChange={(e)=>handleMacCheck(m, e.target.checked)} onClick={e=>e.stopPropagation()} title="Toplu Bakım için Seç" />
-                           <div style={{fontWeight: 900, fontSize: 11, width:"100%", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", padding:"0 4px", color: statusColor}} title={safeStr(m.name)}>{safeStr(m.name)}</div>
+                           <div style={{fontWeight: 900, fontSize: 11, width:"100%", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", padding:"0 4px", color: statusColor}}>{safeStr(m.name)}</div>
                            <div style={{fontSize: 8, marginTop: 2, fontWeight: 700, color: (m.status === "active" && !dueSpecialTask && !pendingSpecialTask && statusLabel==="ÇALIŞIYOR") ? "var(--dim)" : statusColor}}>
                              {stopReason || statusLabel}
                            </div>
@@ -1618,11 +1648,16 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
                       );
                     }
 
+                    // LİSTE GÖRÜNÜMÜ (Açıklama direkt altında yazar)
                     return (
                       <div key={m.id} className={`card ${cardPulseClass}`} style={{borderColor: (m.status!=="active" || dueSpecialTask || pendingSpecialTask) ? cardBorderColor : isChecked ? "var(--blue)" : "var(--border)", cursor:"pointer", background: cardBg}} onClick={()=>setSelMacDetail({mac:m, cat:cat})}>
                         <input type="checkbox" className="mac-check" checked={isChecked} onChange={(e)=>handleMacCheck(m, e.target.checked)} onClick={e=>e.stopPropagation()} title="Toplu Bakım için Seç" />
                         <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", paddingRight: 30}}>
-                          <div><div style={{fontWeight:800, fontSize:16}}>{safeStr(m.name)}</div><div style={{fontSize:11, color:"var(--dim)", marginTop:2}}>{safeStr(m.brand)} {safeStr(m.model)}</div></div>
+                          <div>
+                             <div style={{fontWeight:800, fontSize:16}}>{safeStr(m.name)}</div>
+                             <div style={{fontSize:11, color:"var(--dim)", marginTop:2}}>{safeStr(m.brand)} {safeStr(m.model)}</div>
+                             {openDesc && <div style={{fontSize:11, color:statusColor, marginTop:4, fontStyle:"italic", maxWidth:"90%", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>💬 {openDesc}</div>}
+                          </div>
                           <div style={{display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6}}>
                             <span className="badge" style={{background: badgeBg, color: badgeColor}}>{stopReason || statusLabel}</span>
                             <button className="btn btn-ghost btn-xs" onClick={(e)=>{e.stopPropagation(); checkPw(()=>setModal({type:"edit_machine", mac:m}));}}>Ayarlar</button>
