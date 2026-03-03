@@ -41,8 +41,11 @@ textarea.inp{resize:vertical;min-height:80px}
 
 @keyframes pulse-red { 0% {box-shadow: 0 0 0 0 rgba(239,68,68,0.4);} 70% {box-shadow: 0 0 0 10px rgba(239,68,68,0);} 100% {box-shadow: 0 0 0 0 rgba(239,68,68,0);} }
 @keyframes pulse-amber { 0% {box-shadow: 0 0 0 0 rgba(245,158,11,0.4);} 70% {box-shadow: 0 0 0 10px rgba(245,158,11,0);} 100% {box-shadow: 0 0 0 0 rgba(245,158,11,0);} }
+@keyframes pulse-special { 0% {box-shadow: 0 0 0 0 rgba(234,179,8,0.6);} 70% {box-shadow: 0 0 0 10px rgba(234,179,8,0);} 100% {box-shadow: 0 0 0 0 rgba(234,179,8,0);} }
+
 .pulse-fault { animation: pulse-red 2s infinite; border-color: rgba(239,68,68,0.6) !important; }
 .pulse-stopped { animation: pulse-amber 2s infinite; border-color: rgba(245,158,11,0.6) !important; }
+.pulse-special { animation: pulse-special 2s infinite; border-color: rgba(234,179,8,0.8) !important; }
 
 .mini-prog-bg { height: 6px; background: var(--inp); border-radius: 3px; overflow: hidden; margin-top: 4px; border:1px solid rgba(255,255,255,0.05);}
 .mini-prog-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
@@ -86,7 +89,6 @@ const { useState, useEffect, useMemo } = React;
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz6SLmqw-gyU0Ay5rnAwez7sqdL0B-3aZI2AbE8fMYJpJhfqLeh4N_QdKcFHLEeoQxl/exec";
 
 // --- MESAİ İÇİ DURUŞ HESAPLAMA MOTORU (HAFTASONU HARİÇ) ---
-// Not: Saatler artık sabit değil, ayarlardan gelen dinamik verilerle (shiftStart, shiftEnd) hesaplanır.
 const calcShiftDowntime = (startStr, endStr, shiftStart = "08:00", shiftEnd = "17:30") => {
   const start = new Date(startStr);
   const end = new Date(endStr);
@@ -101,7 +103,6 @@ const calcShiftDowntime = (startStr, endStr, shiftStart = "08:00", shiftEnd = "1
   while (current < end && loopLimit < 365) { 
     const dayOfWeek = current.getDay(); 
     
-    // Cumartesi (6) veya Pazar (0) ise hesaplamadan atla
     if (dayOfWeek !== 0 && dayOfWeek !== 6) {
       let dayShiftStart = new Date(current);
       dayShiftStart.setHours(sH, sM, 0, 0);
@@ -126,7 +127,6 @@ const calcShiftDowntime = (startStr, endStr, shiftStart = "08:00", shiftEnd = "1
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
 
-// TİMEZONE ZIRHI (TARİH OKUMA)
 const safeTime = d => { 
   if(!d) return 0;
   let str = String(d);
@@ -158,7 +158,6 @@ const safeArr = (v) => Array.isArray(v) ? v : [];
 const safeObj = (v) => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
 const safeStr = (v) => (v === null || v === undefined) ? "" : String(v);
 
-// Arayüzde kirlilik yaratmaması için teknik etiketleri gizleyen yardımcı fonksiyon
 const cleanTag = (str) => safeStr(str).replace(/\[MAKİNE DURDU\]\n?/g, "").replace(/\[ÇALIŞIYOR\]\n?/g, "");
 
 const InfoBtn = ({ msg }) => (
@@ -184,7 +183,7 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// --- SİSTEM AYARLARI MODALI (YENİ EKLENDİ) ---
+// --- SİSTEM AYARLARI MODALI ---
 const SettingsModal = ({ settings, onClose, onSave }) => {
   const [sStart, setSStart] = useState(settings.shiftStart);
   const [sEnd, setSEnd] = useState(settings.shiftEnd);
@@ -234,7 +233,7 @@ const LeaderboardModal = ({ type, data, filtMonth, onClose, onSelectMac }) => {
       if (!mac) return null;
       let totalMins = 0, fCount = 0;
       safeArr(data.faults).forEach(f => {
-        if (f && f.macId === mac.id && f.status === "closed" && f.type !== "bakim") {
+        if (f && f.macId === mac.id && f.status === "closed" && f.type !== "bakim" && f.type !== "is_emri") {
           if (filtMonth && f.end && !toYMD(f.end).startsWith(filtMonth)) return;
           totalMins += (Number(f.downtime) || 0);
           if (f.type === "ariza") fCount++;
@@ -321,13 +320,11 @@ function ConfirmModal({ msg, onYes, onNo }) {
 const RecordDetailModal = ({ record, type, macName, onClose, sendData, checkPw, settings }) => {
   const [isEdit, setIsEdit] = useState(false);
   
-  // Eski kayıtlarda etiket yoksa arızanın duruş yarattığını varsay
   const isOriginallyWorking = safeStr(record.desc).includes("[ÇALIŞIYOR]");
   const [isMachineStopped, setIsMachineStopped] = useState(
       record.type === 'durus' || (record.type === 'ariza' && !isOriginallyWorking)
   );
 
-  // YENİ: Geçmişe dönük saat düzeltme state'leri
   const [editStart, setEditStart] = useState(record.start ? toDTL(record.start) : "");
   const [editEnd, setEditEnd] = useState(record.end ? toDTL(record.end) : "");
   
@@ -353,7 +350,6 @@ const RecordDetailModal = ({ record, type, macName, onClose, sendData, checkPw, 
       if (record.type === "ariza") {
           finalDesc = (isMachineStopped ? "[MAKİNE DURDU]\n" : "[ÇALIŞIYOR]\n") + desc;
       }
-      // EditStart ve EditEnd'i de gönderiyoruz (Eğer backend bunları algılıyorsa işler).
       success = await sendData("update_fault", { id: record.id, reason, desc: finalDesc, downtime, closedBy, closeNote, materials, start: editStart, end: editEnd });
     } else {
       success = await sendData("update_maint", { id: record.id, person, notes, checks });
@@ -368,7 +364,7 @@ const RecordDetailModal = ({ record, type, macName, onClose, sendData, checkPw, 
           <React.Fragment>
             <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", borderBottom:"1px solid var(--border)", paddingBottom:15}}>
               <div>
-                <h3 style={{color:"var(--blue)", fontSize:18}}>{type === "fault" ? "Arıza & Duruş Raporu" : "Bakım Raporu"}</h3>
+                <h3 style={{color:"var(--blue)", fontSize:18}}>{type === "fault" ? (record.type === "is_emri" ? "Özel Bakım / İş Emri Raporu" : "Arıza & Duruş Raporu") : "Bakım Raporu"}</h3>
                 <div style={{fontSize:12, color:"var(--dim)", marginTop:4}}>{safeStr(macName)} • {type==="fault"?fd(record.start):fd(record.date)}</div>
               </div>
               <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
@@ -378,34 +374,37 @@ const RecordDetailModal = ({ record, type, macName, onClose, sendData, checkPw, 
                 {type === "fault" ? (
                   <>
                     <div className="grid-2">
-                      <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">BİLDİREN <InfoBtn msg="Arızayı/duruşu sisteme giren operatör veya personel." /></div><div style={{fontWeight:600}}>{safeStr(record.by)}</div></div>
-                      <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">KAPATAN <InfoBtn msg="Arızayı onarıp sistemi tekrar devreye alan bakım personeli." /></div><div style={{fontWeight:600}}>{safeStr(record.closedBy) || "—"}</div></div>
+                      <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">BİLDİREN / PLANLAYAN</div><div style={{fontWeight:600}}>{safeStr(record.by)}</div></div>
+                      <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">KAPATAN / TAMAMLAYAN</div><div style={{fontWeight:600}}>{safeStr(record.closedBy) || "—"}</div></div>
                     </div>
                     <div className="grid-2">
-                      <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">AÇILIŞ (BİLDİRİM) ZAMANI</div><div style={{fontWeight:600}}>{fd(record.start)}</div></div>
+                      <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">{record.type === "is_emri" ? "HEDEF TARİH" : "AÇILIŞ (BİLDİRİM) ZAMANI"}</div><div style={{fontWeight:600}}>{fd(record.start)}</div></div>
                       <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">KAPANIŞ ZAMANI</div><div style={{fontWeight:600, color:record.status==="closed"?"var(--green)":"var(--amber)"}}>{record.status === "closed" ? fd(record.end) : "Açık / Devam Ediyor"}</div></div>
                     </div>
                     
                     <div style={{background:"var(--inp)", padding:12, borderRadius:8}}>
-                      <div className="lbl">DURUŞ SEBEBİ & TİPİ <InfoBtn msg="Sisteme girilen ana duruş kategorisi." /></div>
+                      <div className="lbl">KAYIT TİPİ / SEBEBİ</div>
                       <div style={{fontWeight:700, color:"var(--amber)", fontSize:14}}>{safeStr(record.reason)} <span style={{fontSize:12, color:"var(--mute)"}}>({safeStr(record.type || "Bilinmiyor").toUpperCase()})</span></div>
                     </div>
-                    <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">BİLDİRİM AÇIKLAMASI <InfoBtn msg="Operatörün arıza anında düştüğü not." /></div><div style={{color:"var(--text)"}}>{cleanTag(record.desc)}</div></div>
-                    <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">YAPILAN İŞLEM NOTU <InfoBtn msg="Bakım ekibinin sorunu nasıl çözdüğüne dair girdiği not." /></div><div style={{color:"var(--green)"}}>{safeStr(record.closeNote)}</div></div>
-                    <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">DEĞİŞEN PARÇA / MALZEME <InfoBtn msg="Tamir esnasında yenisiyle değiştirilen parçalar." /></div><div style={{color:"var(--amber)", fontWeight:"bold"}}>{safeStr(record.materials) || "Kullanılmadı"}</div></div>
-                    <div style={{background:"var(--inp)", padding:12, borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                      <div className="lbl" style={{margin:0}}>TOPLAM DURUŞ SÜRESİ <InfoBtn msg="Bildirim anı ile kapatılma anı arasında geçen net dakika." /></div>
-                      <div style={{fontWeight:900, color:"var(--red)", fontSize:18}}>{safeStr(record.downtime)} dk</div>
-                    </div>
+                    <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">AÇIKLAMA / YAPILACAKLAR</div><div style={{color:"var(--text)"}}>{cleanTag(record.desc)}</div></div>
+                    <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">YAPILAN İŞLEM NOTU</div><div style={{color:"var(--green)"}}>{safeStr(record.closeNote)}</div></div>
+                    <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">DEĞİŞEN PARÇA / MALZEME</div><div style={{color:"var(--amber)", fontWeight:"bold"}}>{safeStr(record.materials) || "Kullanılmadı"}</div></div>
+                    
+                    {record.type !== "is_emri" && (
+                      <div style={{background:"var(--inp)", padding:12, borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                        <div className="lbl" style={{margin:0}}>TOPLAM DURUŞ SÜRESİ</div>
+                        <div style={{fontWeight:900, color:"var(--red)", fontSize:18}}>{safeStr(record.downtime)} dk</div>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <>
                     <div className="grid-2">
-                      <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">BAKIMI YAPAN <InfoBtn msg="Planlı bakımı gerçekleştiren personel." /></div><div style={{fontWeight:600}}>{safeStr(record.by)}</div></div>
-                      <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">BAKIM ŞABLONU <InfoBtn msg="Uygulanan bakımın türü ve periyodu." /></div><div style={{fontWeight:600, color:"var(--blue)"}}>{safeStr(record.type)}</div></div>
+                      <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">BAKIMI YAPAN</div><div style={{fontWeight:600}}>{safeStr(record.by)}</div></div>
+                      <div style={{background:"var(--inp)", padding:12, borderRadius:8}}><div className="lbl">BAKIM ŞABLONU</div><div style={{fontWeight:600, color:"var(--blue)"}}>{safeStr(record.type)}</div></div>
                     </div>
                     <div style={{background:"var(--inp)", padding:12, borderRadius:8}}>
-                      <div className="lbl">YAPILAN KONTROLLER <InfoBtn msg="Bakım sırasında onaylanan/kontrol edilen maddeler." /></div>
+                      <div className="lbl">YAPILAN KONTROLLER</div>
                       <div style={{color:"var(--text)", lineHeight:1.5}}>
                         {record.checks ? safeStr(record.checks).split(',').map((c,i)=><div key={i}>✓ {safeStr(c).trim()}</div>) : <div style={{color:"var(--dim)"}}>İşaretlenen madde yok.</div>}
                       </div>
@@ -422,37 +421,36 @@ const RecordDetailModal = ({ record, type, macName, onClose, sendData, checkPw, 
                 </div>
                 {type === "fault" ? (
                   <>
-                    <div><label className="lbl">Duruş Sebebi <InfoBtn msg="Arızanın türünü değiştirir." /></label><input className="inp" value={reason} onChange={e=>setReason(e.target.value)} /></div>
+                    <div><label className="lbl">Duruş Sebebi</label><input className="inp" value={reason} onChange={e=>setReason(e.target.value)} /></div>
                     
                     {record.type === "ariza" && (
                         <div style={{background:"var(--bg)", padding:10, borderRadius:8, border:"1px solid var(--border)", display:"flex", alignItems:"center", gap:10}}>
                             <input type="checkbox" id="chkStopEdit" checked={isMachineStopped} onChange={e=>setIsMachineStopped(e.target.checked)} style={{width:18, height:18, cursor:"pointer"}} />
-                            <label className="lbl" htmlFor="chkStopEdit" style={{marginBottom:0, cursor:"pointer"}}>Bu arıza makineyi durdurdu (Geçmişe Yönelik Etkiler)</label>
+                            <label className="lbl" htmlFor="chkStopEdit" style={{marginBottom:0, cursor:"pointer"}}>Bu arıza makineyi durdurdu</label>
                         </div>
                     )}
                     
-                    {/* YENİ EKLENDİ: Saat Düzenleme ve Otomatik Duruş Hesaplama */}
                     <div className="grid-2">
                         <div>
-                           <label className="lbl">Açılış Zamanı <InfoBtn msg="Tarihi değiştirirseniz, duruş süresi otomatik hesaplanır." /></label>
+                           <label className="lbl">{record.type === "is_emri" ? "Hedef Tarih" : "Açılış Zamanı"}</label>
                            <input type="datetime-local" className="inp" value={editStart} onChange={e=>{ 
                                setEditStart(e.target.value); 
-                               if(editEnd && e.target.value) setDowntime(calcShiftDowntime(e.target.value, editEnd, settings.shiftStart, settings.shiftEnd)); 
+                               if(editEnd && e.target.value && record.type !== "is_emri") setDowntime(calcShiftDowntime(e.target.value, editEnd, settings.shiftStart, settings.shiftEnd)); 
                            }} />
                         </div>
                         <div>
-                           <label className="lbl">Kapanış Zamanı <InfoBtn msg="Tarihi değiştirirseniz, duruş süresi otomatik hesaplanır." /></label>
+                           <label className="lbl">Kapanış Zamanı</label>
                            <input type="datetime-local" className="inp" value={editEnd} onChange={e=>{ 
                                setEditEnd(e.target.value); 
-                               if(editStart && e.target.value) setDowntime(calcShiftDowntime(editStart, e.target.value, settings.shiftStart, settings.shiftEnd)); 
+                               if(editStart && e.target.value && record.type !== "is_emri") setDowntime(calcShiftDowntime(editStart, e.target.value, settings.shiftStart, settings.shiftEnd)); 
                            }} />
                         </div>
                     </div>
 
-                    <div><label className="lbl">Bildirim Açıklaması</label><textarea className="inp" style={{minHeight:50}} value={desc} onChange={e=>setDesc(e.target.value)} /></div>
+                    <div><label className="lbl">Bildirim / Plan Açıklaması</label><textarea className="inp" style={{minHeight:50}} value={desc} onChange={e=>setDesc(e.target.value)} /></div>
                     <div className="grid-2">
                       <div><label className="lbl">Kapatan Bakımcı</label><input className="inp" value={closedBy} onChange={e=>setClosedBy(e.target.value)} /></div>
-                      <div><label className="lbl">Duruş Süresi (Dakika) <InfoBtn msg="Saatler değiştiğinde otomatik hesaplanır, ancak isterseniz manuel de yazabilirsiniz." /></label><input type="number" min="0" className="inp" value={downtime} onChange={e=>setDowntime(e.target.value)} /></div>
+                      <div><label className="lbl">Duruş Süresi (Dakika)</label><input type="number" min="0" className="inp" value={downtime} onChange={e=>setDowntime(e.target.value)} disabled={record.type === "is_emri"} /></div>
                     </div>
                     <div><label className="lbl">Yapılan İşlem Notu</label><textarea className="inp" style={{minHeight:50}} value={closeNote} onChange={e=>setCloseNote(e.target.value)} /></div>
                     <div><label className="lbl">Değişen Parça / Malzeme</label><textarea className="inp" style={{minHeight:50}} value={materials} onChange={e=>setMaterials(e.target.value)} /></div>
@@ -460,7 +458,7 @@ const RecordDetailModal = ({ record, type, macName, onClose, sendData, checkPw, 
                 ) : (
                   <>
                     <div><label className="lbl">Bakımı Yapan</label><input className="inp" value={person} onChange={e=>setPerson(e.target.value)} /></div>
-                    <div><label className="lbl">Yapılan Kontroller (Virgülle ayırın) <InfoBtn msg="Manuel olarak madde ekleyip çıkarabilirsiniz." /></label><textarea className="inp" style={{minHeight:50}} value={checks} onChange={e=>setChecks(e.target.value)} /></div>
+                    <div><label className="lbl">Yapılan Kontroller (Virgülle ayırın)</label><textarea className="inp" style={{minHeight:50}} value={checks} onChange={e=>setChecks(e.target.value)} /></div>
                     <div><label className="lbl">Ekstra Notlar</label><textarea className="inp" style={{minHeight:50}} value={notes} onChange={e=>setNotes(e.target.value)} /></div>
                   </>
                 )}
@@ -477,9 +475,9 @@ const RecordDetailModal = ({ record, type, macName, onClose, sendData, checkPw, 
   );
 };
 
-// --- TOPLU BAKIM GİRİŞ MODALI ---
+// --- YENİ EKLENEN: TOPLU BAKIM GİRİŞ MODALI (ÇOKLU SEÇİM) ---
 const BulkMaintModal = ({ selectedMacs, data, onClose, sendData }) => {
-  const [tplKey, setTplKey] = useState("");
+  const [selTplKeys, setSelTplKeys] = useState([]); // Artık bir dizi (array) tutuyor
   const [person, setPerson] = useState("");
   const [notes, setNotes] = useState("");
   const [formDate, setFormDate] = useState(toDTL(new Date()));
@@ -509,12 +507,13 @@ const BulkMaintModal = ({ selectedMacs, data, onClose, sendData }) => {
   }, [selectedMacs, data.categories]);
 
   const handleBulkSubmit = async () => {
-    if(!tplKey || !person) return alert("Şablon ve Yapan Kişi zorunludur!");
+    if(selTplKeys.length === 0 || !person) return alert("En az bir şablon ve Yapan Kişi zorunludur!");
     if(!formDate) return alert("HATA: Tarih ve saat alanı boş bırakılamaz!");
     if (new Date(formDate) > new Date()) return alert("HATA: Gelecek bir tarih/saat seçemezsiniz!");
 
     setProgress(1);
     
+    // Her makine için, seçilen her şablonu gönder (İç içe döngü)
     for (let i = 0; i < selectedMacs.length; i++) {
       const m = selectedMacs[i];
       if(!m) continue;
@@ -522,18 +521,20 @@ const BulkMaintModal = ({ selectedMacs, data, onClose, sendData }) => {
       const hasCustomTpl = m.templates && Object.keys(safeObj(m.templates)).length > 0;
       const tpls = safeObj(hasCustomTpl ? m.templates : (c?.templates || {}));
       
-      const tpl = tpls[tplKey];
-      if (tpl) {
-        const allItems = safeArr(tpl?.items).join(", ");
-        await sendData("log_maint", { 
-           id: "MNT-"+uid(), machineId: m.id, maintType: tplKey, 
-           person: person, checks: allItems, notes: notes, customDate: formDate 
-        }, true);
+      for (const tplKey of selTplKeys) {
+          const tpl = tpls[tplKey];
+          if (tpl) {
+            const allItems = safeArr(tpl?.items).join(", ");
+            await sendData("log_maint", { 
+                id: "MNT-"+uid(), machineId: m.id, maintType: tplKey, 
+                person: person, checks: allItems, notes: notes, customDate: formDate 
+            }, true);
+          }
       }
       setProgress(i + 2);
     }
     
-    alert("Toplu bakım başarıyla işlendi!");
+    alert("Toplu bakımlar başarıyla işlendi!");
     onClose(); 
   };
 
@@ -547,27 +548,37 @@ const BulkMaintModal = ({ selectedMacs, data, onClose, sendData }) => {
             
             {progress > 0 ? (
                <div style={{textAlign:"center", padding:30}}>
-                  <div className="spinner" style={{margin:"0 auto 15px auto"}}></div>
-                  <div style={{fontWeight:800}}>Kaydediliyor... Lütfen Bekleyin.</div>
-                  <div style={{color:"var(--blue)", marginTop:10}}>{progress - 1} / {selectedMacs.length} İşlendi</div>
+                 <div className="spinner" style={{margin:"0 auto 15px auto"}}></div>
+                 <div style={{fontWeight:800}}>Kaydediliyor... Lütfen Bekleyin.</div>
+                 <div style={{color:"var(--blue)", marginTop:10}}>{progress - 1} / {selectedMacs.length} Makine İşlendi</div>
                </div>
             ) : (
               <div style={{display:"flex", flexDirection:"column", gap:12}}>
                 {availableTpls.length === 0 && <div style={{color:"var(--red)", fontSize:12, padding:10, background:"rgba(239,68,68,0.1)", borderRadius:8}}>⚠️ Seçtiğiniz makinelerin tümünde ortak bulunan bir bakım şablonu yok. Lütfen seçimlerinizi gözden geçirin.</div>}
                 
                 <div><label className="lbl">Uygulanacak Tarih / Saat <InfoBtn msg="Bakımın yapıldığı tarih. Tüm seçili makinelere bu tarih işlenir." /></label><input type="datetime-local" className="inp" value={formDate} onChange={e=>setFormDate(e.target.value)} /></div>
-                <div><label className="lbl">Uygulanacak Bakım Şablonu * <InfoBtn msg="Seçili makinelerin TÜMÜNDE ortak olan bakım şablonları listelenir." /></label>
-                  <select className="inp" value={tplKey} onChange={e=>setTplKey(e.target.value)}>
-                    <option value="">-- Şablon Seçin --</option>
-                    {availableTpls.map(([k, label]) => <option key={k} value={k}>{label} ({k})</option>)}
-                  </select>
+                
+                {/* ÇOKLU SEÇİM KUTULARI */}
+                <div><label className="lbl">Uygulanacak Bakım Şablonları * (Birden fazla seçebilirsiniz) <InfoBtn msg="Seçili makinelerin TÜMÜNDE ortak olan bakım şablonları listelenir." /></label>
+                  <div style={{display:"flex", flexDirection:"column", gap:6, background:"var(--inp)", padding:10, borderRadius:8, border:"1px solid var(--border)", maxHeight:150, overflowY:"auto"}}>
+                    {availableTpls.map(([k, label]) => (
+                      <label key={k} style={{display:"flex", alignItems:"center", gap:8, cursor:"pointer"}}>
+                        <input type="checkbox" checked={selTplKeys.includes(k)} onChange={(e) => {
+                          if(e.target.checked) setSelTplKeys([...selTplKeys, k]);
+                          else setSelTplKeys(selTplKeys.filter(x => x !== k));
+                        }} style={{width:16, height:16}} />
+                        <span style={{fontSize:13, color:"var(--text)"}}>{label} <span style={{color:"var(--dim)", fontSize:11}}>({k})</span></span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
+
                 <div><label className="lbl">Bakımı Yapan Kişi *</label><input className="inp" value={person} onChange={e=>setPerson(e.target.value)} /></div>
                 <div><label className="lbl">Ortak Not (Opsiyonel)</label><textarea className="inp" style={{minHeight:50}} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Tüm makineler için genel bir not..."/></div>
                 
                 <div className="grid-2" style={{marginTop:10}}>
                   <button className="btn btn-ghost" style={{justifyContent:"center"}} onClick={()=>onClose()}>İptal</button>
-                  <button className="btn btn-blue" style={{justifyContent:"center"}} onClick={handleBulkSubmit} disabled={availableTpls.length === 0}>⚡ Otomatik Doldur</button>
+                  <button className="btn btn-blue" style={{justifyContent:"center"}} onClick={handleBulkSubmit} disabled={selTplKeys.length === 0 || availableTpls.length === 0}>⚡ Seçilenleri Doldur</button>
                 </div>
               </div>
             )}
@@ -742,7 +753,6 @@ const MachineManagerModal = ({ mac, categories, onClose, sendData }) => {
                   <div><label className="lbl">Marka</label><input className="inp" value={form.brand} onChange={e=>setForm({...form, brand: e.target.value})} /></div>
                   <div><label className="lbl">Model</label><input className="inp" value={form.model} onChange={e=>setForm({...form, model: e.target.value})} /></div>
                 </div>
-                {/* MANUEL DURUM DEĞİŞİMİ ALANI İPTAL EDİLMİŞTİR */}
                 <div className="grid-2" style={{marginTop:10}}>
                   <button className="btn btn-blue" style={{justifyContent:"center"}} onClick={handleSave}>💾 Kaydet</button>
                   {isEdit && <button className="btn btn-dng" style={{justifyContent:"center"}} onClick={()=>setConfirmDel(true)}>🗑 Makineyi Sil</button>}
@@ -807,11 +817,11 @@ const RepairModal = ({ repTgt, onClose, sendData, settings }) => {
     if(startStr.includes(" ")) startStr = startStr.replace(" ", "T");
     const startDt = new Date(startStr);
     
-    if (endDt < startDt) return alert("HATA: Arızayı kapatma zamanı, arızanın başladığı zamandan (" + fd(repTgt?.start) + ") daha eski olamaz!");
+    if (endDt < startDt && repTgt?.type !== "is_emri") return alert("HATA: Kapatma zamanı, arızanın başladığı zamandan daha eski olamaz!");
 
     setIsSubmitting(true); 
     // Ayarlardan gelen mesai saatlerine göre hesaplar
-    const calculatedDowntime = calcShiftDowntime(startStr, formDate, settings.shiftStart, settings.shiftEnd);
+    const calculatedDowntime = repTgt?.type === "is_emri" ? 0 : calcShiftDowntime(startStr, formDate, settings.shiftStart, settings.shiftEnd);
 
     const success = await sendData("close_fault", { 
       id: repTgt.id, 
@@ -830,21 +840,21 @@ const RepairModal = ({ repTgt, onClose, sendData, settings }) => {
         <ErrorBoundary>
           <React.Fragment>
             <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:15}}>
-              <h3 style={{color:"var(--green)"}}>Müdahale & Duruş Sonlandırma</h3>
+              <h3 style={{color:"var(--green)"}}>{repTgt?.type === "is_emri" ? "Özel Bakımı Tamamla" : "Müdahale & Duruş Sonlandırma"}</h3>
               <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
             </div>
             <div style={{background:"var(--inp)", padding:12, borderRadius:8, marginBottom:15, border:"1px solid var(--border)"}}>
               <strong style={{color:"var(--amber)", fontSize:14}}>[{safeStr(repTgt?.reason)}]</strong>
               <p style={{fontSize:13, marginTop:6, color:"var(--text)"}}>{cleanTag(repTgt?.desc)}</p>
-              <div style={{fontSize:11, color:"var(--dim)", marginTop:8}}>Başlangıç: {fd(repTgt?.start)}</div>
+              <div style={{fontSize:11, color:"var(--dim)", marginTop:8}}>{repTgt?.type === "is_emri" ? "Hedef Tarih:" : "Başlangıç:"} {fd(repTgt?.start)}</div>
             </div>
             <div style={{display:"flex", flexDirection:"column", gap:12}}>
-              <div><label className="lbl">Müdahale Eden * <InfoBtn msg="Arızayı gideren teknik personelin adı." /></label><input className="inp" value={by} onChange={e=>setBy(e.target.value)} placeholder="Ad Soyad"/></div>
-              <div><label className="lbl">Kapatma Tarihi / Saati <InfoBtn msg="Duruşun fiilen bittiği zaman. Duruş süresi girilen MESAİ SAATLERİNE göre net hesaplanır." /></label><input type="datetime-local" className="inp" value={formDate} onChange={e=>setFormDate(e.target.value)} /></div>
-              <div><label className="lbl">Yapılan İşlem * <InfoBtn msg="Arızayı çözmek için yapılan teknik müdahalenin detayı." /></label><textarea className="inp" value={note} onChange={e=>setNote(e.target.value)}/></div>
-              <div><label className="lbl">Yedek Parça / Malzeme <InfoBtn msg="Kullanılan parçaları virgülle ayırarak yazın (Parça sicili için önemlidir)." /></label><textarea className="inp" style={{minHeight:50}} value={parts} onChange={e=>setParts(e.target.value)} placeholder="1 adet sensör vb."/></div>
+              <div><label className="lbl">Müdahale Eden / Tamamlayan *</label><input className="inp" value={by} onChange={e=>setBy(e.target.value)} placeholder="Ad Soyad"/></div>
+              <div><label className="lbl">Tamamlanma Tarihi / Saati</label><input type="datetime-local" className="inp" value={formDate} onChange={e=>setFormDate(e.target.value)} /></div>
+              <div><label className="lbl">Yapılan İşlem *</label><textarea className="inp" value={note} onChange={e=>setNote(e.target.value)}/></div>
+              <div><label className="lbl">Yedek Parça / Malzeme (Opsiyonel)</label><textarea className="inp" style={{minHeight:50}} value={parts} onChange={e=>setParts(e.target.value)} placeholder="1 adet sensör vb."/></div>
               <button className="btn btn-green" style={{justifyContent:"center", padding:14, opacity: isSubmitting ? 0.7 : 1}} onClick={handle} disabled={isSubmitting}>
-                {isSubmitting ? "⏳ KAYDEDİLİYOR..." : "✅ İşlemi Bitir & Devreye Al"}
+                {isSubmitting ? "⏳ KAYDEDİLİYOR..." : (repTgt?.type === "is_emri" ? "✅ İş Emrini Kapat" : "✅ İşlemi Bitir & Devreye Al")}
               </button>
             </div>
           </React.Fragment>
@@ -885,7 +895,7 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw, settin
     let downTotal = 0, faultCount = 0, opCount = 0, faultMins = 0;
     let faultDates = [];
     filteredFaults.forEach(f => {
-      if(f.status === "closed" && f.type !== "bakim") {
+      if(f.status === "closed" && f.type !== "bakim" && f.type !== "is_emri") {
         const d = (Number(f.downtime) || 0);
         downTotal += d;
         if(f.type === "ariza") { 
@@ -919,7 +929,7 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw, settin
     let downToday = 0, downMonth = 0, downTotal = 0;
 
     safeArr(data.faults).forEach(f => {
-      if(f && f.macId === mac?.id && f.type !== "bakim") {
+      if(f && f.macId === mac?.id && f.type !== "bakim" && f.type !== "is_emri") {
         let fStart = safeTime(f.start);
         let fEnd = (f.status === "closed" && f.end) ? safeTime(f.end) : now.getTime();
         
@@ -1091,7 +1101,7 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw, settin
             {tab === "history" && (
               <div style={{display:"flex", flexDirection:"column", gap:16}}>
                 <div>
-                  <div className="lbl" style={{color:"var(--red)"}}>Arıza & Duruş Listesi (Detay için tıkla) <InfoBtn msg="Makinenin geçmişte yaşadığı tüm arıza ve duruşların listesi. Tıklayarak rapor detayına ulaşabilirsiniz." /></div>
+                  <div className="lbl" style={{color:"var(--red)"}}>Arıza, Duruş & Özel Bakım Listesi <InfoBtn msg="Makinenin geçmişte yaşadığı tüm arıza ve duruşların listesi. Tıklayarak rapor detayına ulaşabilirsiniz." /></div>
                   <div style={{maxHeight:200, overflowY:"auto", border:"1px solid var(--border)", borderRadius:8, marginBottom:16}}>
                     <table>
                      <thead style={{background:"var(--inp)", position:"sticky", top:0}}><tr><th>Tip</th><th>Sebep</th><th>Tarih</th><th>Kapatan</th><th>İşlem</th><th>Dk</th></tr></thead>
@@ -1099,12 +1109,12 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw, settin
                         {filteredFaults.length === 0 && <tr><td colSpan="6" style={{textAlign:"center", color:"var(--dim)"}}>Kayıt yok</td></tr>}
                         {filteredFaults.map(f => (
                          <tr key={f.id} className="clickable-row" onClick={() => setSelRecord({type: "fault", data: f})}>
-                           <td>{f.type==="ariza"?"🔴":"🟠"}</td>
+                           <td>{f.type==="ariza"?"🔴":f.type==="is_emri"?"📅":"🟠"}</td>
                            <td style={{fontWeight:600}}>{safeStr(f.reason)}</td>
                            <td>{fd(f.start, true)}</td>
                            <td>{safeStr(f.closedBy) || "—"}</td>
                            <td title={safeStr(f.closeNote)}>{safeStr(f.closeNote).substring(0, 15)}{safeStr(f.closeNote).length > 15 ? "..." : ""}</td>
-                           <td style={{color:"var(--red)", fontWeight:700}}>{f.status==="closed" && f.type!=="bakim" ? safeStr(f.downtime) : "—"}</td>
+                           <td style={{color:f.type==="is_emri"?"var(--dim)":"var(--red)", fontWeight:700}}>{f.status==="closed" && f.type!=="bakim" && f.type!=="is_emri" ? safeStr(f.downtime) : "—"}</td>
                          </tr>
                         ))}
                       </tbody>
@@ -1244,7 +1254,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
   const [bulkMacs, setBulkMacs] = useState([]);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [leaderboardType, setLeaderboardType] = useState(null);
-  const [viewMode, setViewMode] = useState("list"); // list veya grid(kuşbakışı)
+  const [viewMode, setViewMode] = useState("list");
 
   const activeFaults = safeArr(data.faults).filter(f => f && f.status === "open" && safeArr(data.machines).some(m => m && m.id === f.macId));
 
@@ -1299,7 +1309,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
       let faultDates = [];
       let oilDates = []; 
 
-      safeArr(data.faults).filter(f => f && f.macId === mac.id && f.status === "closed" && f.type !== "bakim").forEach(f => {
+      safeArr(data.faults).filter(f => f && f.macId === mac.id && f.status === "closed" && f.type !== "bakim" && f.type !== "is_emri").forEach(f => {
         if(filtMonth && f.end) {
           const ymd = toYMD(f.end);
           if(ymd && !ymd.startsWith(filtMonth)) return; 
@@ -1418,15 +1428,14 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
     if(checked) setBulkMacs([...bulkMacs, mac]);
     else setBulkMacs(bulkMacs.filter(m => m.id !== mac.id));
   };
-const handleSelectAllCat = (catId, isSelect) => {
+  
+  const handleSelectAllCat = (catId, isSelect) => {
     const catMacs = safeArr(data.machines).filter(m => m && m.catId === catId);
     if (isSelect) {
-      // Sadece o kategorideki makineleri mevcut listeye ekle (aynı makine 2 kere eklenmesin diye Set mantığı kullanıyoruz)
       const newBulk = [...bulkMacs];
       catMacs.forEach(m => { if (!newBulk.some(x => x.id === m.id)) newBulk.push(m); });
       setBulkMacs(newBulk);
     } else {
-      // Sadece o kategorideki makineleri listeden çıkar
       setBulkMacs(bulkMacs.filter(m => !catMacs.some(x => x.id === m.id)));
     }
   };
@@ -1466,11 +1475,11 @@ const handleSelectAllCat = (catId, isSelect) => {
             />
           </div>
           {tab === "overview" && (
-  <div style={{display:"flex", gap:4, background:"var(--inp)", padding:4, borderRadius:8, border:"1px solid var(--border)"}}>
-    <button className={`btn btn-sm ${viewMode==="list"?"btn-blue":"btn-ghost"}`} style={{border:"none"}} onClick={()=>setViewMode("list")}>📄 Liste</button>
-    <button className={`btn btn-sm ${viewMode==="grid"?"btn-blue":"btn-ghost"}`} style={{border:"none"}} onClick={()=>setViewMode("grid")}>🏢 Kuşbakışı</button>
-  </div>
-)}
+            <div style={{display:"flex", gap:4, background:"var(--inp)", padding:4, borderRadius:8, border:"1px solid var(--border)"}}>
+              <button className={`btn btn-sm ${viewMode==="list"?"btn-blue":"btn-ghost"}`} style={{border:"none"}} onClick={()=>setViewMode("list")}>📄 Liste</button>
+              <button className={`btn btn-sm ${viewMode==="grid"?"btn-blue":"btn-ghost"}`} style={{border:"none"}} onClick={()=>setViewMode("grid")}>🏢 Kuşbakışı</button>
+            </div>
+          )}
           <select className="inp" style={{width:"auto", minWidth:200}} value={listCatFilter} onChange={e=>setListCatFilter(e.target.value)}>
             <option value="">-- Tüm Kategoriler --</option>
             {safeArr(data.categories).map(c => c && <option key={c.id} value={c.id}>{safeStr(c.name)}</option>)}
@@ -1485,6 +1494,7 @@ const handleSelectAllCat = (catId, isSelect) => {
             if(listCatFilter && cat.id !== listCatFilter) return null;
             const macs = safeArr(data.machines).filter(m => m && m.catId === cat.id && (safeStr(m.name).toLowerCase().includes(search.toLowerCase()) || safeStr(m.brand).toLowerCase().includes(search.toLowerCase())));
             if(macs.length === 0) return null;
+            
             return (
               <div key={cat.id} style={{marginBottom:24}}>
                 <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", borderBottom:"1px solid var(--border)", paddingBottom:8, marginBottom:12}}>
@@ -1522,36 +1532,78 @@ const handleSelectAllCat = (catId, isSelect) => {
                     
                     mTrackers.sort((a,b) => a.diffDays - b.diffDays);
                     const isChecked = bulkMacs.some(x => x.id === m.id);
-                    const activeF = data.faults.find(f => f.macId === m.id && f.status === "open");
-                    const stopReason = activeF ? safeStr(activeF.reason) : "";
+                    
+                    // --- YENİ EKLENEN İŞ EMRİ KONTROLÜ (SARI YANMA EFEKTİ) ---
+                    const openTickets = safeArr(data.faults).filter(f => f.macId === m.id && f.status === "open");
+                    const activeF = openTickets.find(f => f.type !== "is_emri"); // Normal Arıza veya Duruş
+                    const dueSpecialTask = openTickets.find(f => f.type === "is_emri" && new Date(f.start).getTime() <= todayMs);
+                    
+                    const stopReason = activeF ? safeStr(activeF.reason) : (dueSpecialTask ? "ÖZEL BAKIM ZAMANI" : "");
+                    
+                    // Dinamik sınıflandırma
+                    let cardPulseClass = "";
+                    let cardBorderColor = "var(--border)";
+                    let cardBg = "rgba(16,185,129,0.05)";
+                    let statusLabel = "ÇALIŞIYOR";
+                    let statusColor = "var(--text)";
+                    let badgeBg = "#10b98120";
+                    let badgeColor = "var(--green)";
 
+                    if (m.status === 'fault') {
+                       cardPulseClass = 'pulse-fault';
+                       cardBorderColor = 'var(--red)';
+                       cardBg = 'rgba(239,68,68,0.15)';
+                       statusLabel = 'ARIZALI';
+                       statusColor = 'var(--red)';
+                       badgeBg = '#ef444420';
+                       badgeColor = 'var(--red)';
+                    } else if (m.status === 'stopped') {
+                       cardPulseClass = 'pulse-stopped';
+                       cardBorderColor = 'var(--amber)';
+                       cardBg = 'rgba(245,158,11,0.15)';
+                       statusLabel = 'DURDU';
+                       statusColor = 'var(--amber)';
+                       badgeBg = '#f59e0b20';
+                       badgeColor = 'var(--amber)';
+                    } else if (dueSpecialTask) {
+                       cardPulseClass = 'pulse-special'; // Sarı yansın
+                       cardBorderColor = '#eab308';
+                       cardBg = 'rgba(234, 179, 8, 0.15)';
+                       statusLabel = 'ÖZEL BAKIM ZAMANI';
+                       statusColor = '#eab308';
+                       badgeBg = '#eab30820';
+                       badgeColor = '#eab308';
+                    }
+
+                    // KUŞBAKIŞI GÖRÜNÜM
                     if (viewMode === "grid") {
                       return (
-                        <div key={m.id} className={`card ${m.status === 'fault' ? 'pulse-fault' : m.status === 'stopped' ? 'pulse-stopped' : ''} clickable-card`}
+                        <div key={m.id} className={`card ${cardPulseClass} clickable-card`}
                              style={{
                                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                                height: "55px", textAlign: "center", padding: "4px",
-                               background: m.status === "active" ? "rgba(16,185,129,0.05)" : m.status === "fault" ? "rgba(239,68,68,0.15)" : "rgba(245,158,11,0.15)",
-                               border: `2px solid ${m.status === "active" ? "var(--border)" : m.status === "fault" ? "var(--red)" : "var(--amber)"}`,
+                               background: cardBg,
+                               border: `2px solid ${cardBorderColor}`,
                                position: "relative", overflow: "hidden"
                              }}
                              onClick={()=>setSelMacDetail({mac:m, cat:cat})}>
                            <input type="checkbox" className="mac-check" style={{position:"absolute", top:2, right:2, width:12, height:12, margin:0}} checked={isChecked} onChange={(e)=>handleMacCheck(m, e.target.checked)} onClick={e=>e.stopPropagation()} title="Toplu Bakım için Seç" />
-                           <div style={{fontWeight: 900, fontSize: 11, width:"100%", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", padding:"0 4px", color: m.status === "active" ? "var(--text)" : m.status === "fault" ? "var(--red)" : "var(--amber)"}} title={safeStr(m.name)}>{safeStr(m.name)}</div>
-                           <div style={{fontSize: 8, marginTop: 2, fontWeight: 700, color: m.status === "active" ? "var(--dim)" : "#fff"}}>
-                             {m.status === "active" ? "ÇALIŞIYOR" : (stopReason || "DURDU")}
+                           <div style={{fontWeight: 900, fontSize: 11, width:"100%", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", padding:"0 4px", color: statusColor}} title={safeStr(m.name)}>{safeStr(m.name)}</div>
+                           <div style={{fontSize: 8, marginTop: 2, fontWeight: 700, color: (m.status === "active" && !dueSpecialTask) ? "var(--dim)" : "#fff"}}>
+                             {stopReason || statusLabel}
                            </div>
                         </div>
                       );
                     }
 
+                    // LİSTE GÖRÜNÜMÜ
                     return (
-                      <div key={m.id} className={`card ${m.status === 'fault' ? 'pulse-fault' : m.status === 'stopped' ? 'pulse-stopped' : ''}`} style={{borderColor: m.status==="fault"?"#ef444490":m.status==="stopped"?"#f59e0b90": isChecked ? "var(--blue)" : "var(--border)", cursor:"pointer"}} onClick={()=>setSelMacDetail({mac:m, cat:cat})}>
+                      <div key={m.id} className={`card ${cardPulseClass}`} style={{borderColor: (m.status!=="active" || dueSpecialTask) ? cardBorderColor : isChecked ? "var(--blue)" : "var(--border)", cursor:"pointer"}} onClick={()=>setSelMacDetail({mac:m, cat:cat})}>
                         <input type="checkbox" className="mac-check" checked={isChecked} onChange={(e)=>handleMacCheck(m, e.target.checked)} onClick={e=>e.stopPropagation()} title="Toplu Bakım için Seç" />
                         <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", paddingRight: 30}}>
                           <div><div style={{fontWeight:800, fontSize:16}}>{safeStr(m.name)}</div><div style={{fontSize:11, color:"var(--dim)", marginTop:2}}>{safeStr(m.brand)} {safeStr(m.model)}</div></div>
                           <div style={{display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6}}>
-                            <span className="badge" style={{background: m.status==="active"?"#10b98120":m.status==="fault"?"#ef444420":"#f59e0b20", color: m.status==="active"?"var(--green)":m.status==="fault"?"var(--red)":"var(--amber)"}}>{m.status === "active" ? "ÇALIŞIYOR" : m.status === "fault" ? "ARIZALI" : "DURDU"}</span>
+                            <span className="badge" style={{background: badgeBg, color: badgeColor}}>{stopReason || statusLabel}</span>
                             <button className="btn btn-ghost btn-xs" onClick={(e)=>{e.stopPropagation(); checkPw(()=>setModal({type:"edit_machine", mac:m}));}}>Ayarlar</button>
                           </div>
                         </div>
@@ -1603,15 +1655,16 @@ const handleSelectAllCat = (catId, isSelect) => {
               return mName.includes(term) || safeStr(f.desc).toLowerCase().includes(term) || safeStr(f.by).toLowerCase().includes(term);
             }).map(f => {
               const mac = safeArr(data.machines).find(m => m && m.id === f.macId);
+              const isEmri = f.type === "is_emri";
               return (
-                <div key={f.id} className={`card ${f.type==='ariza'?'pulse-fault':'pulse-stopped'}`} style={{borderLeft: `4px solid ${f.type==="ariza"?"var(--red)":f.type==="durus"?"var(--amber)":"var(--blue)"}`}}>
+                <div key={f.id} className={`card ${f.type==='ariza'?'pulse-fault': isEmri ? 'pulse-special' : 'pulse-stopped'}`} style={{borderLeft: `4px solid ${f.type==="ariza"?"var(--red)":isEmri ? "#eab308" : "var(--amber)"}`}}>
                   <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:10}}>
                     <div>
-                      <div style={{display:"flex", alignItems:"center", gap:8}}><span style={{fontWeight:800, fontSize:16}}>{safeStr(mac?.name)}</span><span className="badge" style={{background:"var(--inp)", color:"var(--dim)"}}>{safeStr(f.type).toUpperCase()}</span></div>
-                      <div style={{fontSize:12, color:"var(--dim)", marginTop:4}}>Bildiren: <b style={{color:"var(--text)"}}>{safeStr(f.by)}</b> • Tarih: {fd(f.start)}</div>
+                      <div style={{display:"flex", alignItems:"center", gap:8}}><span style={{fontWeight:800, fontSize:16}}>{safeStr(mac?.name)}</span><span className="badge" style={{background:"var(--inp)", color:isEmri ? "#eab308" :"var(--dim)"}}>{isEmri ? "ÖZEL İŞ EMRİ" : safeStr(f.type).toUpperCase()}</span></div>
+                      <div style={{fontSize:12, color:"var(--dim)", marginTop:4}}>{isEmri ? "Planlayan:" : "Bildiren:"} <b style={{color:"var(--text)"}}>{safeStr(f.by)}</b> • {isEmri ? "Hedef:" : "Tarih:"} {fd(f.start)}</div>
                       <div style={{fontSize:14, marginTop:8}}><span style={{fontWeight:800, color:f.type==="ariza"?"var(--red)":"var(--amber)"}}>[{safeStr(f.reason)}]</span> {cleanTag(f.desc)}</div>
                     </div>
-                    <button className="btn btn-green" onClick={()=>checkPw(() => setRepTgt(f))}>🔧 Kapat</button>
+                    <button className="btn btn-green" onClick={()=>checkPw(() => setRepTgt(f))}>🔧 {isEmri ? "Bakımı Tamamla" : "Kapat"}</button>
                   </div>
                 </div>
               );
@@ -1745,7 +1798,7 @@ const handleSelectAllCat = (catId, isSelect) => {
   );
 };
 
-// --- MOBİL SAHA UYGULAMASI ---
+// --- MOBİL SAHA UYGULAMASI (ÖZEL İŞ EMRİ EKLENDİ) ---
 const Mobile = ({ data, setPg, sendData, initialMacId, setRepTgt }) => {
   const [selCat, setSelCat] = useState(null); 
   const [selMac, setSelMac] = useState(null); 
@@ -1760,7 +1813,6 @@ const Mobile = ({ data, setPg, sendData, initialMacId, setRepTgt }) => {
   const [isSuccess, setIsSuccess] = useState(false); 
   const [isSubmitting, setIsSubmitting] = useState(false); 
   
-  // YENİ EKLENDİ: Arıza makineyi durdurdu mu durumu
   const [isMachineStopped, setIsMachineStopped] = useState(true);
 
   useEffect(() => {
@@ -1779,8 +1831,9 @@ const Mobile = ({ data, setPg, sendData, initialMacId, setRepTgt }) => {
     if(!by) return alert("Ad Soyad zorunludur!");
     if(!formDate) return alert("HATA: Tarih ve saat alanı boş bırakılamaz!"); 
     
-    if (new Date(formDate) > new Date()) {
-       return alert("HATA: İleri bir tarih/saat seçemezsiniz!");
+    // Özel bakım planlamıyorsak geleceğe tarih girilemez
+    if (type !== "is_emri" && new Date(formDate) > new Date()) {
+       return alert("HATA: Arıza veya normal bakım için ileri bir tarih seçemezsiniz!");
     }
 
     setIsSubmitting(true); 
@@ -1800,14 +1853,18 @@ const Mobile = ({ data, setPg, sendData, initialMacId, setRepTgt }) => {
       return;
     }
     
-    if(!desc || !reason) { setIsSubmitting(false); return alert("Sebep ve Açıklama zorunludur!"); }
+    if(!desc) { setIsSubmitting(false); return alert("Açıklama zorunludur!"); }
+    if((type === "ariza" || type === "durus") && !reason) { setIsSubmitting(false); return alert("Sebep seçimi zorunludur!"); }
     
     let finalDesc = desc;
     if (type === "ariza") {
         finalDesc = (isMachineStopped ? "[MAKİNE DURDU]\n" : "[ÇALIŞIYOR]\n") + desc;
     }
 
-    const success = await sendData("report_fault", { id: "FLT-"+uid(), machineId: selMac.id, type, reason: reason, desc: finalDesc, reportedBy: by, customDate: isoDate });
+    // Özel İş Emri (Custom Maintenance) olarak kaydediyoruz
+    const finalReason = type === "is_emri" ? "Özel Planlı Bakım" : reason;
+
+    const success = await sendData("report_fault", { id: "FLT-"+uid(), machineId: selMac.id, type, reason: finalReason, desc: finalDesc, reportedBy: by, customDate: isoDate });
     setIsSubmitting(false); 
     if(success) { setIsSuccess(true); } 
   };
@@ -1873,11 +1930,12 @@ const Mobile = ({ data, setPg, sendData, initialMacId, setRepTgt }) => {
             <div style={{fontSize:12, color:"var(--dim)", marginTop:2}}>{safeStr(selCat?.name)} • {safeStr(selMac?.brand)}</div>
           </div>
 
-          <div className="tabs" style={{marginBottom:16}}>
+          <div className="tabs" style={{marginBottom:16, flexWrap:"wrap"}}>
             <div className={`tab ${type==="durus"?"active":""}`} style={type==="durus"?{background:"var(--amber)",color:"#000"}:{}} onClick={()=>{setType("durus"); setIsMachineStopped(true);}}>🟠 Duruş</div>
             <div className={`tab ${type==="ariza"?"active":""}`} style={type==="ariza"?{background:"var(--red)",color:"#fff"}:{}} onClick={()=>{setType("ariza"); setIsMachineStopped(true);}}>🔴 Arıza</div>
             <div className={`tab ${type==="bakim"?"active":""}`} style={type==="bakim"?{background:"var(--green)",color:"#fff"}:{}} onClick={()=>setType("bakim")}>🟢 Bakım</div>
-            <div className={`tab ${type==="open"?"active":""}`} style={type==="open"?{background:"var(--purple)",color:"#fff"}:{}} onClick={()=>setType("open")}>🔧 Açık İşler ({openFaults.length})</div>
+            <div className={`tab ${type==="is_emri"?"active":""}`} style={type==="is_emri"?{background:"#eab308",color:"#000"}:{}} onClick={()=>{setType("is_emri"); setFormDate(toDTL(new Date(Date.now() + 86400000)));}}>📅 Özel Plan</div>
+            <div className={`tab ${type==="open"?"active":""}`} style={type==="open"?{background:"var(--purple)",color:"#fff"}:{}} onClick={()=>setType("open")}>🔧 Açıklar ({openFaults.length})</div>
           </div>
 
           <div className="card">
@@ -1886,18 +1944,19 @@ const Mobile = ({ data, setPg, sendData, initialMacId, setRepTgt }) => {
                <div style={{display:"flex", flexDirection:"column", gap:12}}>
                  {openFaults.length === 0 ? <div style={{textAlign:"center", color:"var(--dim)", padding:20}}>Bu makinede açık iş emri yok.</div> : null}
                  {openFaults.map(f => (
-                   <div key={f.id} style={{padding:12, background:"var(--inp)", borderRadius:8, borderLeft: `4px solid ${f.type==="ariza"?"var(--red)":"var(--amber)"}`}}>
-                      <div style={{fontSize:11, color:"var(--mute)", marginBottom:4}}>{fd(f.start)} • Bildiren: {safeStr(f.by)}</div>
-                      <div style={{fontSize:14, fontWeight:"bold", color:"var(--text)"}}><span style={{color:"var(--amber)"}}>[{safeStr(f.reason)}]</span> {cleanTag(f.desc)}</div>
+                   <div key={f.id} style={{padding:12, background:"var(--inp)", borderRadius:8, borderLeft: `4px solid ${f.type==="ariza"?"var(--red)":f.type==="is_emri"?"#eab308":"var(--amber)"}`}}>
+                      <div style={{fontSize:11, color:"var(--mute)", marginBottom:4}}>{fd(f.start)} • Plan/Bildiren: {safeStr(f.by)}</div>
+                      <div style={{fontSize:14, fontWeight:"bold", color:"var(--text)"}}><span style={{color:f.type==="is_emri"?"#eab308":"var(--amber)"}}>[{f.type==="is_emri"?"ÖZEL BAKIM":safeStr(f.reason)}]</span> {cleanTag(f.desc)}</div>
                       <button className="btn btn-green btn-sm" style={{width:"100%", marginTop:12, justifyContent:"center"}} onClick={() => setRepTgt(f)}>Müdahale Et & Kapat</button>
                    </div>
                  ))}
                </div>
             ) : (
               <div style={{display:"flex", flexDirection:"column", gap:14}}>
-                {(type === "durus" || type === "ariza") && (
+                {(type === "durus" || type === "ariza" || type === "is_emri") && (
                   <>
-                    <div><label className="lbl">Kayıt Tarihi / Saati <InfoBtn msg="Geçmiş bir kayıt giriyorsanız tarihi değiştirebilirsiniz."/></label>
+                    <div>
+                      <label className="lbl">{type === "is_emri" ? "Hedef Tarih / Saat (Gelecek Seçin) *" : "Kayıt Tarihi / Saati"}</label>
                       <input type="datetime-local" className="inp" value={formDate} onChange={e=>setFormDate(e.target.value)} />
                     </div>
                     
@@ -1908,15 +1967,20 @@ const Mobile = ({ data, setPg, sendData, initialMacId, setRepTgt }) => {
                       </div>
                     )}
                     
-                    <div><label className="lbl">Sebep * <InfoBtn msg="Makinenin neden durduğunu seçin."/></label>
-                      <select className="inp" value={reason} onChange={e=>setReason(e.target.value)}>
-                        <option value="">-- Sebep Seçin --</option>
-                        {type === "ariza" && <><option>Mekanik</option><option>Elektrik</option><option>Hidrolik/Pnömatik</option></>}
-                        {type === "durus" && safeArr(selCat?.reasons).map(r => <option key={r} value={r}>{r}</option>)}
-                        <option value="Diğer">Diğer...</option>
-                      </select>
+                    {type !== "is_emri" && (
+                      <div><label className="lbl">Sebep *</label>
+                        <select className="inp" value={reason} onChange={e=>setReason(e.target.value)}>
+                          <option value="">-- Sebep Seçin --</option>
+                          {type === "ariza" && <><option>Mekanik</option><option>Elektrik</option><option>Hidrolik/Pnömatik</option></>}
+                          {type === "durus" && safeArr(selCat?.reasons).map(r => <option key={r} value={r}>{r}</option>)}
+                          <option value="Diğer">Diğer...</option>
+                        </select>
+                      </div>
+                    )}
+                    
+                    <div><label className="lbl">{type === "is_emri" ? "Neler Yapılacak? (Detaylı yazın) *" : "Açıklama *"}</label>
+                         <textarea className="inp" value={desc} onChange={e=>setDesc(e.target.value)} placeholder={type==="is_emri"?"Örn: Ana şanzıman sökülüp bilyaları kontrol edilecek...":""} />
                     </div>
-                    <div><label className="lbl">Açıklama * <InfoBtn msg="Durumla ilgili detaylı not yazın."/></label><textarea className="inp" value={desc} onChange={e=>setDesc(e.target.value)} /></div>
                   </>
                 )}
 
@@ -1926,10 +1990,10 @@ const Mobile = ({ data, setPg, sendData, initialMacId, setRepTgt }) => {
                       <div style={{padding:15, color:"var(--red)", textAlign:"center"}}>Bakım şablonu tanımlanmamış.</div>
                     ) : (
                       <>
-                        <div><label className="lbl">Kayıt Tarihi / Saati <InfoBtn msg="Geçmiş bir kayıt giriyorsanız tarihi değiştirebilirsiniz."/></label>
+                        <div><label className="lbl">Kayıt Tarihi / Saati</label>
                           <input type="datetime-local" className="inp" value={formDate} onChange={e=>setFormDate(e.target.value)} />
                         </div>
-                        <div><label className="lbl">Bakım Tipi * <InfoBtn msg="Hangi periyodik bakımın yapıldığını seçin."/></label>
+                        <div><label className="lbl">Bakım Tipi *</label>
                           <select className="inp" value={selTplKey} onChange={e=>{setSelTplKey(e.target.value); setChecks({});}}>
                             <option value="">-- Şablon Seçin --</option>
                             {Object.entries(tpls).map(([k, v]) => {
@@ -1939,7 +2003,7 @@ const Mobile = ({ data, setPg, sendData, initialMacId, setRepTgt }) => {
                           </select>
                         </div>
                         {selTplKey && tpls[selTplKey] && tpls[selTplKey].items && (
-                          <div><label className="lbl">Kontrol Listesi <InfoBtn msg="Tamamladığınız adımları işaretleyin."/></label>
+                          <div><label className="lbl">Kontrol Listesi</label>
                             <div style={{display:"flex", flexDirection:"column", gap:6}}>
                               {safeArr(tpls[selTplKey].items).map((item, i) => (
                                 <div key={i} className={`chk-item ${checks[i]?"done":""}`} onClick={()=>setChecks({...checks, [i]:!checks[i]})}>
@@ -1959,8 +2023,8 @@ const Mobile = ({ data, setPg, sendData, initialMacId, setRepTgt }) => {
                 {(type !== "bakim" || hasTemplates) && (
                   <>
                     <div><label className="lbl">Ad Soyad *</label><input className="inp" value={by} onChange={e=>setBy(e.target.value)} /></div>
-                    <button className="btn" style={{background: type==="ariza"?"var(--red)":type==="durus"?"var(--amber)":"var(--green)", color:type==="durus"?"#000":"#fff", justifyContent:"center", padding:14, fontSize:15, opacity: isSubmitting ? 0.7 : 1}} onClick={handleSubmit} disabled={isSubmitting}>
-                      {isSubmitting ? "⏳ GÖNDERİLİYOR..." : "GÖNDER"}
+                    <button className="btn" style={{background: type==="ariza"?"var(--red)":type==="durus"?"var(--amber)":type==="is_emri"?"#eab308":"var(--green)", color:type==="durus"||type==="is_emri"?"#000":"#fff", justifyContent:"center", padding:14, fontSize:15, opacity: isSubmitting ? 0.7 : 1}} onClick={handleSubmit} disabled={isSubmitting}>
+                      {isSubmitting ? "⏳ KAYDEDİLİYOR..." : (type==="is_emri" ? "KAYDET & PLANA EKLE" : "GÖNDER")}
                     </button>
                   </>
                 )}
@@ -1979,7 +2043,6 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   
-  // YENİ: Sistem ayarlarına ulaşım ve tarayıcıya kaydetme
   const [settings, setSettings] = useState(() => {
     try {
       const saved = localStorage.getItem("prox_settings");
