@@ -201,8 +201,13 @@ const SettingsModal = ({ settings, onClose, onSave }) => {
         <ErrorBoundary>
           <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:15}}>
             <h3 style={{color:"var(--blue)"}}>Sistem Ayarları</h3>
-            <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
-          </div>
+            <div style={{display:"flex", gap:10, alignItems:"center"}}>
+                <button className="btn btn-amber btn-sm" onClick={() => window.location.href = window.location.pathname + "?mac=" + mac.id}>
+                  📱 Saha Ekranına Git
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+              </div>
+            </div>
           <div style={{display:"flex", flexDirection:"column", gap:12}}>
             <div style={{background:"var(--inp)", padding:15, borderRadius:8, border:"1px solid var(--border)"}}>
                 <div className="lbl" style={{color:"var(--amber)", marginBottom:10}}>VARDİYA / MESAİ SAATLERİ</div>
