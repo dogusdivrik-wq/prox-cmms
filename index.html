@@ -39,7 +39,7 @@ textarea.inp{resize:vertical;min-height:80px}
 .spinner{width:40px;height:40px;border:4px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin 1s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
 
-/* GÜNCELLENEN ANİMASYONLAR VE RENK EFEKTLERİ */
+/* ANİMASYONLAR VE RENK EFEKTLERİ */
 @keyframes pulse-red { 0% {box-shadow: 0 0 0 0 rgba(239,68,68,0.4);} 70% {box-shadow: 0 0 0 10px rgba(239,68,68,0);} 100% {box-shadow: 0 0 0 0 rgba(239,68,68,0);} }
 @keyframes pulse-amber { 0% {box-shadow: 0 0 0 0 rgba(245,158,11,0.4);} 70% {box-shadow: 0 0 0 10px rgba(245,158,11,0);} 100% {box-shadow: 0 0 0 0 rgba(245,158,11,0);} }
 @keyframes pulse-blue { 0% {box-shadow: 0 0 0 0 rgba(59,130,246,0.4);} 70% {box-shadow: 0 0 0 10px rgba(59,130,246,0);} 100% {box-shadow: 0 0 0 0 rgba(59,130,246,0);} }
@@ -201,13 +201,8 @@ const SettingsModal = ({ settings, onClose, onSave }) => {
         <ErrorBoundary>
           <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:15}}>
             <h3 style={{color:"var(--blue)"}}>Sistem Ayarları</h3>
-            <div style={{display:"flex", gap:10, alignItems:"center"}}>
-                <button className="btn btn-amber btn-sm" onClick={() => window.location.href = window.location.pathname + "?mac=" + mac.id}>
-                  📱 Saha Ekranına Git
-                </button>
-                <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
-              </div>
-            </div>
+            <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+          </div>
           <div style={{display:"flex", flexDirection:"column", gap:12}}>
             <div style={{background:"var(--inp)", padding:15, borderRadius:8, border:"1px solid var(--border)"}}>
                 <div className="lbl" style={{color:"var(--amber)", marginBottom:10}}>VARDİYA / MESAİ SAATLERİ</div>
@@ -481,11 +476,13 @@ const RecordDetailModal = ({ record, type, macName, onClose, sendData, checkPw, 
   );
 };
 
-// --- TOPLU BAKIM GİRİŞ MODALI ---
+// --- TOPLU İŞLEM MODALI (BAKIM, ARIZA, DURUŞ) ---
 const BulkMaintModal = ({ selectedMacs, data, onClose, sendData }) => {
+  const [tab, setTab] = useState("bakim"); 
   const [selTplKeys, setSelTplKeys] = useState([]);
   const [person, setPerson] = useState("");
   const [notes, setNotes] = useState("");
+  const [reason, setReason] = useState(""); 
   const [formDate, setFormDate] = useState(toDTL(new Date()));
   const [progress, setProgress] = useState(0);
 
@@ -512,34 +509,68 @@ const BulkMaintModal = ({ selectedMacs, data, onClose, sendData }) => {
     return (commonKeys || []).map(k => [k, labels[k]]);
   }, [selectedMacs, data.categories]);
 
+  // Ortak duruş sebeplerini bulmak için (Sadece seçili makinelerin kategorilerindeki ortak sebepleri bulur)
+  const availableReasons = useMemo(() => {
+      if (!selectedMacs || selectedMacs.length === 0) return [];
+      let commonReasons = null;
+      
+      safeArr(selectedMacs).forEach(m => {
+          if(!m) return;
+          const c = safeArr(data.categories).find(x => x && x.id === m.catId);
+          const reasons = safeArr(c?.reasons);
+          
+          if (commonReasons === null) {
+              commonReasons = reasons;
+          } else {
+              commonReasons = commonReasons.filter(r => reasons.includes(r));
+          }
+      });
+      return commonReasons || [];
+  }, [selectedMacs, data.categories]);
+
   const handleBulkSubmit = async () => {
-    if(selTplKeys.length === 0 || !person) return alert("En az bir şablon ve Yapan Kişi zorunludur!");
+    if(!person) return alert("İlgili Kişi/Personel zorunludur!");
     if(!formDate) return alert("HATA: Tarih ve saat alanı boş bırakılamaz!");
     if (new Date(formDate) > new Date()) return alert("HATA: Gelecek bir tarih/saat seçemezsiniz!");
+
+    if (tab === "bakim" && selTplKeys.length === 0) return alert("Lütfen en az bir bakım şablonu seçin!");
+    if ((tab === "ariza" || tab === "durus") && (!reason || !notes)) return alert("Sebep ve Açıklama zorunludur!");
 
     setProgress(1);
     
     for (let i = 0; i < selectedMacs.length; i++) {
       const m = selectedMacs[i];
       if(!m) continue;
-      const c = safeArr(data.categories).find(x => x && x.id === m.catId);
-      const hasCustomTpl = m.templates && Object.keys(safeObj(m.templates)).length > 0;
-      const tpls = safeObj(hasCustomTpl ? m.templates : (c?.templates || {}));
       
-      for (const tplKey of selTplKeys) {
-          const tpl = tpls[tplKey];
-          if (tpl) {
-            const allItems = safeArr(tpl?.items).join(", ");
-            await sendData("log_maint", { 
-                id: "MNT-"+uid(), machineId: m.id, maintType: tplKey, 
-                person: person, checks: allItems, notes: notes, customDate: formDate 
-            }, true);
+      if (tab === "bakim") {
+          const c = safeArr(data.categories).find(x => x && x.id === m.catId);
+          const hasCustomTpl = m.templates && Object.keys(safeObj(m.templates)).length > 0;
+          const tpls = safeObj(hasCustomTpl ? m.templates : (c?.templates || {}));
+          
+          for (const tplKey of selTplKeys) {
+              const tpl = tpls[tplKey];
+              if (tpl) {
+                const allItems = safeArr(tpl?.items).join(", ");
+                await sendData("log_maint", { 
+                    id: "MNT-"+uid(), machineId: m.id, maintType: tplKey, 
+                    person: person, checks: allItems, notes: notes, customDate: formDate 
+                }, true);
+              }
           }
+      } else {
+          // Arıza veya Duruş Kaydı
+          let finalDesc = notes;
+          if (tab === "ariza") finalDesc = "[MAKİNE DURDU]\n" + notes; // Toplu arıza giriliyorsa durdu varsayılır
+          
+          await sendData("report_fault", { 
+              id: "FLT-"+uid(), machineId: m.id, type: tab, 
+              reason: reason, desc: finalDesc, reportedBy: person, customDate: formDate 
+          }, true);
       }
       setProgress(i + 2);
     }
     
-    alert("Toplu bakımlar başarıyla işlendi!");
+    alert("Toplu işlem başarıyla kaydedildi!");
     onClose(); 
   };
 
@@ -548,9 +579,9 @@ const BulkMaintModal = ({ selectedMacs, data, onClose, sendData }) => {
       <div className="card mbody" onClick={e=>e.stopPropagation()}>
         <ErrorBoundary>
           <React.Fragment>
-            <h3 style={{color:"var(--blue)", marginBottom:10}}>Toplu Otomatik Bakım Doldurma</h3>
-            <p style={{fontSize:12, color:"var(--dim)", marginBottom:15}}>{selectedMacs.length} adet makineye otomatik olarak tüm kontrolleri yapılmış (100%) şeklinde bakım işlenecektir.</p>
-            
+            <h3 style={{color:"var(--blue)", marginBottom:10}}>⚡ Toplu İşlem Merkezi</h3>
+            <p style={{fontSize:12, color:"var(--dim)", marginBottom:15}}>{selectedMacs.length} adet makineye aynı anda kayıt açılacaktır.</p>
+
             {progress > 0 ? (
                <div style={{textAlign:"center", padding:30}}>
                  <div className="spinner" style={{margin:"0 auto 15px auto"}}></div>
@@ -559,30 +590,52 @@ const BulkMaintModal = ({ selectedMacs, data, onClose, sendData }) => {
                </div>
             ) : (
               <div style={{display:"flex", flexDirection:"column", gap:12}}>
-                {availableTpls.length === 0 && <div style={{color:"var(--red)", fontSize:12, padding:10, background:"rgba(239,68,68,0.1)", borderRadius:8}}>⚠️ Seçtiğiniz makinelerin tümünde ortak bulunan bir bakım şablonu yok. Lütfen seçimlerinizi gözden geçirin.</div>}
                 
-                <div><label className="lbl">Uygulanacak Tarih / Saat <InfoBtn msg="Bakımın yapıldığı tarih. Tüm seçili makinelere bu tarih işlenir." /></label><input type="datetime-local" className="inp" value={formDate} onChange={e=>setFormDate(e.target.value)} /></div>
-                
-                <div><label className="lbl">Uygulanacak Bakım Şablonları * (Birden fazla seçebilirsiniz) <InfoBtn msg="Seçili makinelerin TÜMÜNDE ortak olan bakım şablonları listelenir." /></label>
-                  <div style={{display:"flex", flexDirection:"column", gap:6, background:"var(--inp)", padding:10, borderRadius:8, border:"1px solid var(--border)", maxHeight:150, overflowY:"auto"}}>
-                    {availableTpls.map(([k, label]) => (
-                      <label key={k} style={{display:"flex", alignItems:"center", gap:8, cursor:"pointer"}}>
-                        <input type="checkbox" checked={selTplKeys.includes(k)} onChange={(e) => {
-                          if(e.target.checked) setSelTplKeys([...selTplKeys, k]);
-                          else setSelTplKeys(selTplKeys.filter(x => x !== k));
-                        }} style={{width:16, height:16}} />
-                        <span style={{fontSize:13, color:"var(--text)"}}>{label} <span style={{color:"var(--dim)", fontSize:11}}>({k})</span></span>
-                      </label>
-                    ))}
-                  </div>
+                <div className="tabs" style={{marginBottom:10}}>
+                  <div className={`tab ${tab==="bakim"?"active":""}`} style={tab==="bakim"?{background:"var(--green)",color:"#fff"}:{}} onClick={()=>setTab("bakim")}>🟢 Bakım</div>
+                  <div className={`tab ${tab==="durus"?"active":""}`} style={tab==="durus"?{background:"var(--amber)",color:"#000"}:{}} onClick={()=>{setTab("durus"); setReason("");}}>🟠 Duruş</div>
+                  <div className={`tab ${tab==="ariza"?"active":""}`} style={tab==="ariza"?{background:"var(--red)",color:"#fff"}:{}} onClick={()=>{setTab("ariza"); setReason("");}}>🔴 Arıza</div>
                 </div>
 
-                <div><label className="lbl">Bakımı Yapan Kişi *</label><input className="inp" value={person} onChange={e=>setPerson(e.target.value)} /></div>
-                <div><label className="lbl">Ortak Not (Opsiyonel)</label><textarea className="inp" style={{minHeight:50}} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Tüm makineler için genel bir not..."/></div>
+                <div><label className="lbl">Kayıt Tarihi / Saati</label><input type="datetime-local" className="inp" value={formDate} onChange={e=>setFormDate(e.target.value)} /></div>
+
+                {tab === "bakim" && (
+                    <>
+                    {availableTpls.length === 0 && <div style={{color:"var(--red)", fontSize:12, padding:10, background:"rgba(239,68,68,0.1)", borderRadius:8}}>⚠️ Seçtiğiniz makinelerin tümünde ortak bulunan bir bakım şablonu yok. Lütfen seçimlerinizi gözden geçirin.</div>}
+                    <div><label className="lbl">Uygulanacak Bakım Şablonları * (Çoklu seçebilirsiniz)</label>
+                      <div style={{display:"flex", flexDirection:"column", gap:6, background:"var(--inp)", padding:10, borderRadius:8, border:"1px solid var(--border)", maxHeight:150, overflowY:"auto"}}>
+                        {availableTpls.map(([k, label]) => (
+                          <label key={k} style={{display:"flex", alignItems:"center", gap:8, cursor:"pointer"}}>
+                            <input type="checkbox" checked={selTplKeys.includes(k)} onChange={(e) => {
+                              if(e.target.checked) setSelTplKeys([...selTplKeys, k]);
+                              else setSelTplKeys(selTplKeys.filter(x => x !== k));
+                            }} style={{width:16, height:16}} />
+                            <span style={{fontSize:13, color:"var(--text)"}}>{label} <span style={{color:"var(--dim)", fontSize:11}}>({k})</span></span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    </>
+                )}
+
+                {(tab === "ariza" || tab === "durus") && (
+                    <div><label className="lbl">Sebep *</label>
+                      <select className="inp" value={reason} onChange={e=>setReason(e.target.value)}>
+                        <option value="">-- Sebep Seçin --</option>
+                        {tab === "ariza" && <><option>Genel Elektrik Kesintisi</option><option>Genel Hava/Kompresör Kaybı</option><option>Mekanik</option><option>Elektrik</option><option>Hidrolik/Pnömatik</option></>}
+                        {tab === "durus" && availableReasons.map(r => <option key={r} value={r}>{r}</option>)}
+                        <option value="Diğer">Diğer / Ortak Sebep</option>
+                      </select>
+                      {tab === "durus" && availableReasons.length === 0 && <div style={{fontSize:10, color:"var(--amber)", marginTop:4}}>* Seçilen makinelerin ortak duruş sebebi bulunamadı, "Diğer" seçeneğini kullanın.</div>}
+                    </div>
+                )}
+
+                <div><label className="lbl">{tab==="bakim" ? "Bakımı Yapan Kişi *" : "Bildiren Kişi *"}</label><input className="inp" value={person} onChange={e=>setPerson(e.target.value)} /></div>
+                <div><label className="lbl">{tab==="bakim" ? "Ortak Not (Opsiyonel)" : "Açıklama *"}</label><textarea className="inp" style={{minHeight:50}} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Tüm makinelere işlenecek metin..."/></div>
                 
                 <div className="grid-2" style={{marginTop:10}}>
                   <button className="btn btn-ghost" style={{justifyContent:"center"}} onClick={()=>onClose()}>İptal</button>
-                  <button className="btn btn-blue" style={{justifyContent:"center"}} onClick={handleBulkSubmit} disabled={selTplKeys.length === 0 || availableTpls.length === 0}>⚡ Seçilenleri Doldur</button>
+                  <button className="btn btn-blue" style={{justifyContent:"center"}} onClick={handleBulkSubmit}>⚡ Seçilenlere Uygula</button>
                 </div>
               </div>
             )}
@@ -999,7 +1052,6 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw, settin
     return Object.values(counts).sort((a,b) => b.count - a.count);
   }, [filteredFaults]);
 
-  // Aktif bldirimleri pencere açılınca en üstte göstermek için
   const activeTickets = safeArr(data.faults).filter(f => f && f.macId === mac?.id && f.status === "open");
 
   return (
@@ -1012,7 +1064,12 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw, settin
                 <div style={{display:"flex", alignItems:"center", gap:8}}><h2 style={{fontSize:22, fontWeight:900}}>{safeStr(mac?.name)}</h2><span className="badge" style={{background: mac?.status==="active"?"#10b98120":mac?.status==="fault"?"#ef444420":"#f59e0b20", color: mac?.status==="active"?"var(--green)":mac?.status==="fault"?"var(--red)":"var(--amber)"}}>{mac?.status === "active" ? "✓ ÇALIŞIYOR" : mac?.status === "fault" ? "🔴 ARIZALI" : "🟠 DURDU"}</span></div>
                 <div style={{fontSize:13, color:"var(--dim)", marginTop:4}}>{safeStr(cat?.name)} • {safeStr(mac?.brand)} {safeStr(mac?.model)}</div>
               </div>
-              <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+              <div style={{display:"flex", gap:10, alignItems:"center"}}>
+                <button className="btn btn-amber btn-sm" onClick={() => window.location.href = window.location.pathname + "?mac=" + mac.id}>
+                  📱 Saha Ekranına Git
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+              </div>
             </div>
 
             <div className="filters" style={{marginBottom:0, marginTop:10}}>
@@ -1033,7 +1090,6 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw, settin
             {tab === "summary" && (
               <div style={{display:"flex", flexDirection:"column", gap:16}}>
                 
-                {/* --- YENİ: AKTİF BİLDİRİMLER (ŞU AN) BÖLÜMÜ --- */}
                 {activeTickets.length > 0 && (
                     <div style={{marginBottom: 10, marginTop: 10}}>
                         <div className="lbl" style={{color:"var(--amber)"}}>🚨 AKTİF BİLDİRİMLER (ŞU AN)</div>
@@ -1696,7 +1752,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
           
           {bulkMacs.length > 0 && (
             <button className="btn btn-blue bulk-btn-float" onClick={()=>checkPw(()=>setShowBulkModal(true))}>
-              ⚡ Seçili {bulkMacs.length} Makineye Toplu Bakım Gir
+              ⚡ Seçili {bulkMacs.length} Makineye Toplu İşlem Gir
             </button>
           )}
         </ErrorBoundary>
@@ -1859,7 +1915,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
   );
 };
 
-// --- MOBİL SAHA UYGULAMASI (ÖZEL İŞ EMRİ EKLENDİ) ---
+// --- MOBİL SAHA UYGULAMASI ---
 const Mobile = ({ data, setPg, sendData, initialMacId, setRepTgt }) => {
   const [selCat, setSelCat] = useState(null); 
   const [selMac, setSelMac] = useState(null); 
@@ -1892,7 +1948,6 @@ const Mobile = ({ data, setPg, sendData, initialMacId, setRepTgt }) => {
     if(!by) return alert("Ad Soyad zorunludur!");
     if(!formDate) return alert("HATA: Tarih ve saat alanı boş bırakılamaz!"); 
     
-    // Özel bakım planlamıyorsak geleceğe tarih girilemez
     if (type !== "is_emri" && new Date(formDate) > new Date()) {
        return alert("HATA: Arıza veya normal bakım için ileri bir tarih seçemezsiniz!");
     }
@@ -1922,7 +1977,6 @@ const Mobile = ({ data, setPg, sendData, initialMacId, setRepTgt }) => {
         finalDesc = (isMachineStopped ? "[MAKİNE DURDU]\n" : "[ÇALIŞIYOR]\n") + desc;
     }
 
-    // Özel İş Emri (Custom Maintenance) olarak kaydediyoruz
     const finalReason = type === "is_emri" ? "Özel Planlı Bakım" : reason;
 
     const success = await sendData("report_fault", { id: "FLT-"+uid(), machineId: selMac.id, type, reason: finalReason, desc: finalDesc, reportedBy: by, customDate: isoDate });
