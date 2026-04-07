@@ -1580,7 +1580,9 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
   }, [data.machines, data.faults, data.maintenance, data.categories, filtCat, filtMonth]);
 
   const downloadCSV = (type) => {
-    let csvContent = "\uFEFF"; 
+    let csvContent = "\uFEFF"; // Türkçe karakterlerin (Ş, Ğ, İ vb.) Excel'de bozulmaması için BOM işareti
+    const sep = ";"; // Türkiye bölge ayarlı Excel için noktalı virgül ayırıcı şarttır
+
     const escapeField = (field) => {
       if (field === null || field === undefined) return '""';
       const str = String(field).replace(/"/g, '""').replace(/\n/g, ' '); 
@@ -1588,37 +1590,73 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
     };
 
     if (type === 'faults') {
-      csvContent += "Kayıt ID,Makine Adı,Kategori,Kayıt Tipi,Durum,Sebep,Açıklama,Başlangıç Tarihi,Bitiş Tarihi,Duruş Süresi (Dk),Bildiren,Kapatan,Kapatma Notu,Değişen Parçalar\n";
+      // Tam istediğin sıradaki başlıklar
+      csvContent += ["Makine Numarası", "Bölüm", "Kayıt Tipi", "Arızanın Tanımı", "Arıza Detayları", "Başlangıç Tarihi", "Bitiş Tarihi", "Duruş Süresi (Dk)", "Yapılan İşlemler", "Arızayı Açan", "Arızayı Kapatan", "Değişen Parça", "Mevcut Durum"].join(sep) + "\n";
+      
       safeArr(data.faults).forEach(f => {
         if (!f) return;
         const mac = safeArr(data.machines).find(m => m && m.id === f.macId) || {};
         const cat = safeArr(data.categories).find(c => c && c.id === mac.catId) || {};
-        const row = [f.id, mac.name || "Silinmiş", cat.name || "Silinmiş", f.type, f.status, f.reason, cleanTag(f.desc), f.start ? toDTL(f.start).replace('T', ' ') : "", f.end ? toDTL(f.end).replace('T', ' ') : "", f.downtime || 0, f.by, f.closedBy, f.closeNote, f.materials].map(escapeField).join(",");
+        
+        let tip = f.type === "ariza" ? "Arıza" : f.type === "durus" ? "Duruş" : "İş Emri";
+        let durum = f.status === "closed" ? "Kapatıldı" : "Devam Ediyor";
+
+        const row = [
+          mac.name || "Silinmiş",
+          cat.name || "Silinmiş",
+          tip,
+          f.reason,
+          cleanTag(f.desc),
+          f.start ? fd(f.start) : "",
+          f.end ? fd(f.end) : "",
+          f.downtime || 0,
+          f.closeNote,
+          f.by,
+          f.closedBy,
+          f.materials,
+          durum
+        ].map(escapeField).join(sep);
+        
         csvContent += row + "\n";
       });
+
     } else if (type === 'maint') {
-      csvContent += "Kayıt ID,Makine Adı,Kategori,Bakım Şablonu,Tarih,Yapan Kişi,İşaretlenen Kontroller,Notlar\n";
+      // Bakım raporunu da aynı düzende, Excel'e uygun hale getirdik
+      csvContent += ["Makine Numarası", "Bölüm", "Bakım Türü", "Tarih", "Yapan Kişi", "İşaretlenen Kontroller", "Notlar"].join(sep) + "\n";
+      
       safeArr(data.maintenance).forEach(m => {
         if (!m) return;
         const mac = safeArr(data.machines).find(mac => mac && mac.id === m.macId) || {};
         const cat = safeArr(data.categories).find(c => c && c.id === mac.catId) || {};
+        
         let tName = m.type;
         const hasCustomTpl = mac.templates && Object.keys(safeObj(mac.templates)).length > 0;
         const tpls = safeObj(hasCustomTpl ? mac.templates : (cat.templates || {}));
         if (tpls[m.type] && tpls[m.type].label) tName = tpls[m.type].label;
-        const row = [m.id, mac.name || "Silinmiş", cat.name || "Silinmiş", tName, m.date ? toDTL(m.date).replace('T', ' ') : "", m.by, m.checks, m.notes].map(escapeField).join(",");
+        
+        const row = [
+          mac.name || "Silinmiş",
+          cat.name || "Silinmiş",
+          tName,
+          m.date ? fd(m.date) : "",
+          m.by,
+          m.checks,
+          m.notes
+        ].map(escapeField).join(sep);
+        
         csvContent += row + "\n";
       });
     }
+
+    // Dosyayı İndirme İşlemi
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `ProX_${type === 'faults' ? 'Ariza_Durus' : 'Bakim'}_Raporu_${toYMD(new Date())}.csv`;
+    link.download = `ProX_${type === 'faults' ? 'Ariza_Raporu' : 'Bakim_Raporu'}_${toYMD(new Date())}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
-
   const handleMacCheck = (mac, checked) => {
     if(checked) setBulkMacs([...bulkMacs, mac]);
     else setBulkMacs(bulkMacs.filter(m => m.id !== mac.id));
