@@ -165,6 +165,39 @@ const InfoBtn = ({ msg }) => (
   <span className="info-icon" title={msg} onClick={e => e.stopPropagation()}>?</span>
 );
 
+// --- MULTI-SELECT DROPDOWN BİLEŞENİ ---
+const MultiSelect = ({ options, selected, onChange, placeholder }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{position:"relative", minWidth:200, flex:1, maxWidth:300}}>
+      <div className="inp" style={{cursor:"pointer", display:"flex", justifyContent:"space-between", alignItems:"center", height:"100%"}} onClick={()=>setOpen(!open)}>
+        <span style={{overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis", paddingRight:10, color: selected.length>0?"var(--blue)":"var(--text)", fontWeight: selected.length>0?700:400}}>
+          {selected.length === 0 ? placeholder : `${selected.length} Seçili (${placeholder})`}
+        </span>
+        <span style={{fontSize:10, color:"var(--dim)"}}>▼</span>
+      </div>
+      {open && <div className="overlay" style={{background:"transparent", zIndex:999}} onClick={()=>setOpen(false)}></div>}
+      {open && (
+        <div style={{position:"absolute", top:"100%", left:0, right:0, background:"var(--card)", border:"1px solid var(--border)", borderRadius:8, marginTop:4, zIndex:1000, maxHeight:250, overflowY:"auto", boxShadow:"0 10px 30px rgba(0,0,0,0.8)", padding:8, display:"flex", flexDirection:"column", gap:4}}>
+          <label style={{display:"flex", alignItems:"center", gap:8, cursor:"pointer", padding:"8px", borderRadius:6, background:"rgba(255,255,255,0.02)", border:"1px solid transparent"}} className="clickable-row">
+            <input type="checkbox" className="mac-check" style={{position:"static"}} checked={selected.length === 0} onChange={()=>onChange([])} />
+            <span style={{fontSize:13, fontWeight:700}}>Tümü</span>
+          </label>
+          {options.map(opt => (
+            <label key={opt.value} style={{display:"flex", alignItems:"center", gap:8, cursor:"pointer", padding:"8px", borderRadius:6, background:"var(--inp)", border:"1px solid var(--border)"}} className="clickable-row">
+              <input type="checkbox" className="mac-check" style={{position:"static"}} checked={selected.includes(opt.value)} onChange={(e)=>{
+                if(e.target.checked) onChange([...selected, opt.value]);
+                else onChange(selected.filter(x=>x!==opt.value));
+              }} />
+              <span style={{fontSize:13}}>{opt.label}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
   static getDerivedStateFromError(error) { return { hasError: true, error: error }; }
@@ -636,6 +669,71 @@ const BulkMaintModal = ({ selectedMacs, data, onClose, sendData }) => {
                 <div className="grid-2" style={{marginTop:10}}>
                   <button className="btn btn-ghost" style={{justifyContent:"center"}} onClick={()=>onClose()}>İptal</button>
                   <button className="btn btn-blue" style={{justifyContent:"center"}} onClick={handleBulkSubmit}>⚡ Seçilenlere Uygula</button>
+                </div>
+              </div>
+            )}
+          </React.Fragment>
+        </ErrorBoundary>
+      </div>
+    </div>
+  );
+};
+
+// --- YENİ EKLENEN: RADAR İÇİN TOPLU BAKIM TAMAMLAMA MODALI ---
+const BulkCloseMaintModal = ({ selectedTasks, onClose, sendData }) => {
+  const [person, setPerson] = useState("");
+  const [notes, setNotes] = useState("");
+  const [formDate, setFormDate] = useState(toDTL(new Date()));
+  const [progress, setProgress] = useState(0);
+
+  const handleBulkSubmit = async () => {
+    if(!person) return alert("İlgili Kişi/Personel zorunludur!");
+    if(!formDate) return alert("HATA: Tarih ve saat alanı boş bırakılamaz!");
+    if (new Date(formDate) > new Date()) return alert("HATA: Gelecek bir tarih/saat seçemezsiniz!");
+
+    setProgress(1);
+
+    for (let i = 0; i < selectedTasks.length; i++) {
+      const task = selectedTasks[i];
+      if(!task || !task.mac) continue;
+
+      // Tüm kontrol maddeleri eksiksiz işaretlenmiş varsayılır
+      const allItems = safeArr(task.items).join(", ");
+      await sendData("log_maint", {
+        id: "MNT-"+uid(), machineId: task.mac.id, maintType: task.tplKey,
+        person: person, checks: allItems, notes: notes, customDate: formDate
+      }, true);
+
+      setProgress(i + 2);
+    }
+
+    alert("Seçili bakımlar başarıyla gerçekleştirildi!");
+    onClose();
+  };
+
+  return (
+    <div className="overlay" style={{zIndex:4000}} onClick={()=>progress===0 && onClose()}>
+      <div className="card mbody" onClick={e=>e.stopPropagation()}>
+        <ErrorBoundary>
+          <React.Fragment>
+            <h3 style={{color:"var(--green)", marginBottom:10}}>⚡ Toplu Bakım Tamamlama</h3>
+            <p style={{fontSize:12, color:"var(--dim)", marginBottom:15}}>Seçilen {selectedTasks.length} adet gecikmiş/bekleyen bakım için form oluşturulacaktır. Kontrol maddelerinin <b>tümü işaretlenmiş</b> varsayılacaktır.</p>
+
+            {progress > 0 ? (
+              <div style={{textAlign:"center", padding:30}}>
+                <div className="spinner" style={{margin:"0 auto 15px auto"}}></div>
+                <div style={{fontWeight:800}}>Kaydediliyor... Lütfen Bekleyin.</div>
+                <div style={{color:"var(--green)", marginTop:10}}>{progress - 1} / {selectedTasks.length} Bakım İşlendi</div>
+              </div>
+            ) : (
+              <div style={{display:"flex", flexDirection:"column", gap:12}}>
+                <div><label className="lbl">Kayıt Tarihi / Saati</label><input type="datetime-local" className="inp" value={formDate} onChange={e=>setFormDate(e.target.value)} /></div>
+                <div><label className="lbl">Bakımı Yapan Kişi *</label><input className="inp" value={person} onChange={e=>setPerson(e.target.value)} /></div>
+                <div><label className="lbl">Ortak Not (Opsiyonel)</label><textarea className="inp" style={{minHeight:50}} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Toplu kapanış notu..."/></div>
+
+                <div className="grid-2" style={{marginTop:10}}>
+                  <button className="btn btn-ghost" style={{justifyContent:"center"}} onClick={()=>onClose()}>İptal</button>
+                  <button className="btn btn-green" style={{justifyContent:"center"}} onClick={handleBulkSubmit}>✅ Bakımları Tamamla</button>
                 </div>
               </div>
             )}
@@ -1327,15 +1425,33 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
   const [search, setSearch] = useState("");
   const [openSearch, setOpenSearch] = useState("");
   const [maintSearch, setMaintSearch] = useState("");
+  
+  // YENİ FİLTRE VE ÇOKLU SEÇİM STATELERİ
+  const [listCatFilters, setListCatFilters] = useState([]);
+  const [maintTplFilters, setMaintTplFilters] = useState([]);
+  const [maintBulkSelections, setMaintBulkSelections] = useState([]);
+  const [showBulkCloseModal, setShowBulkCloseModal] = useState(false);
+  
   const [filtCat, setFiltCat] = useState("");
   const [filtMonth, setFiltMonth] = useState(new Date().toISOString().slice(0,7));
-  const [listCatFilter, setListCatFilter] = useState("");
   const [bulkMacs, setBulkMacs] = useState([]);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [leaderboardType, setLeaderboardType] = useState(null);
   const [viewMode, setViewMode] = useState("list");
 
   const activeFaults = safeArr(data.faults).filter(f => f && f.status === "open" && safeArr(data.machines).some(m => m && m.id === f.macId));
+
+  // Tesisdeki tüm bakım şablonlarını benzersiz olarak çıkarır (Bakım Türü filtresi için)
+  const allTpls = useMemo(() => {
+    const map = {};
+    safeArr(data.categories).forEach(c => {
+      if (c && c.templates) Object.entries(c.templates).forEach(([k, v]) => { if(v) map[k] = v.label; });
+    });
+    safeArr(data.machines).forEach(m => {
+      if (m && m.templates) Object.entries(m.templates).forEach(([k, v]) => { if(v) map[k] = v.label; });
+    });
+    return Object.entries(map);
+  }, [data.categories, data.machines]);
 
   const maintenanceRadar = useMemo(() => {
     const alerts = [];
@@ -1360,12 +1476,12 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
           diffDays = Math.ceil((nextMs - todayMs) / 86400000);
           
           if (pDays <= 3) {
-             if (diffDays < 0) alerts.push({ mac, cat, label: safeStr(tpl.label), diffDays });
+             if (diffDays < 0) alerts.push({ mac, cat, tplKey: key, label: safeStr(tpl.label), diffDays, items: tpl.items });
           } else {
-             if (diffDays <= 3) alerts.push({ mac, cat, label: safeStr(tpl.label), diffDays });
+             if (diffDays <= 3) alerts.push({ mac, cat, tplKey: key, label: safeStr(tpl.label), diffDays, items: tpl.items });
           }
         } else {
-          alerts.push({ mac, cat, label: safeStr(tpl.label), diffDays: -999 }); 
+          alerts.push({ mac, cat, tplKey: key, label: safeStr(tpl.label), diffDays: -999, items: tpl.items }); 
         }
       });
     });
@@ -1533,14 +1649,14 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
       </div>
 
       <div className="tabs" style={{marginBottom:20, maxWidth:800}}>
-        <div className={`tab ${tab==="overview"?"active":""}`} onClick={()=>{setTab("overview"); setBulkMacs([]); setListCatFilter("");}}>📍 Makine Parkuru <InfoBtn msg="Tesisinizdeki tüm makinelerin güncel durumunu ve yaklaşan bakımlarını gösterir." /></div>
-        <div className={`tab ${tab==="open"?"active":""}`} onClick={()=>{setTab("open"); setListCatFilter("");}}>🚨 Bekleyenler ({activeFaults.length}) <InfoBtn msg="Sahadan bildirilen ve henüz bakım ekibi tarafından kapatılmamış arıza/duruş kayıtları." /></div>
-        <div className={`tab ${tab==="maint"?"active":""}`} onClick={()=>{setTab("maint"); setListCatFilter("");}}>🔔 Bakım Takibi ({maintenanceRadar.length}) <InfoBtn msg="Uzun periyotlu bakımlarda son 3 gün kala, günlük/kısa bakımlarda ise sadece geciktiğinde uyarı veren aciliyet listesi." /></div>
+        <div className={`tab ${tab==="overview"?"active":""}`} onClick={()=>{setTab("overview"); setBulkMacs([]); setListCatFilters([]);}}>📍 Makine Parkuru <InfoBtn msg="Tesisinizdeki tüm makinelerin güncel durumunu ve yaklaşan bakımlarını gösterir." /></div>
+        <div className={`tab ${tab==="open"?"active":""}`} onClick={()=>{setTab("open"); setListCatFilters([]);}}>🚨 Bekleyenler ({activeFaults.length}) <InfoBtn msg="Sahadan bildirilen ve henüz bakım ekibi tarafından kapatılmamış arıza/duruş kayıtları." /></div>
+        <div className={`tab ${tab==="maint"?"active":""}`} onClick={()=>{setTab("maint"); setMaintBulkSelections([]);}}>🔔 Bakım Takibi ({maintenanceRadar.length}) <InfoBtn msg="Uzun periyotlu bakımlarda son 3 gün kala, günlük/kısa bakımlarda ise sadece geciktiğinde uyarı veren aciliyet listesi." /></div>
         <div className={`tab ${tab==="analytics"?"active":""}`} onClick={()=>setTab("analytics")}>📈 İstatistik & KPI <InfoBtn msg="Tesisin genel performansını, duruş analizlerini ve temel metrikleri gösterir." /></div>
       </div>
 
       {tab !== "analytics" && (
-        <div style={{display:"flex", gap:10, marginBottom:20, flexWrap:"wrap"}}>
+        <div style={{display:"flex", gap:10, marginBottom:20, flexWrap:"wrap", alignItems:"center"}}>
           <div className="search-bar" style={{flex:1, minWidth:250, marginBottom:0}}>
             <span style={{marginRight:10}}>🔍</span>
             <input 
@@ -1559,10 +1675,22 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
               <button className={`btn btn-sm ${viewMode==="grid"?"btn-blue":"btn-ghost"}`} style={{border:"none"}} onClick={()=>setViewMode("grid")}>🏢 Kuşbakışı</button>
             </div>
           )}
-          <select className="inp" style={{width:"auto", minWidth:200}} value={listCatFilter} onChange={e=>setListCatFilter(e.target.value)}>
-            <option value="">-- Tüm Kategoriler --</option>
-            {safeArr(data.categories).map(c => c && <option key={c.id} value={c.id}>{safeStr(c.name)}</option>)}
-          </select>
+          
+          <MultiSelect 
+            options={safeArr(data.categories).map(c => ({value: c.id, label: safeStr(c.name)}))} 
+            selected={listCatFilters} 
+            onChange={setListCatFilters} 
+            placeholder="Tüm Kategoriler" 
+          />
+          
+          {tab === "maint" && (
+             <MultiSelect 
+               options={allTpls.map(([k, lbl]) => ({value: k, label: lbl}))} 
+               selected={maintTplFilters} 
+               onChange={setMaintTplFilters} 
+               placeholder="Tüm Bakım Türleri" 
+             />
+          )}
         </div>
       )}
 
@@ -1570,7 +1698,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
         <ErrorBoundary>
           {safeArr(data.categories).map(cat => {
             if(!cat) return null;
-            if(listCatFilter && cat.id !== listCatFilter) return null;
+            if(listCatFilters.length > 0 && !listCatFilters.includes(cat.id)) return null;
             const macs = safeArr(data.machines).filter(m => m && m.catId === cat.id && (safeStr(m.name).toLowerCase().includes(search.toLowerCase()) || safeStr(m.brand).toLowerCase().includes(search.toLowerCase())));
             if(macs.length === 0) return null;
             
@@ -1615,18 +1743,13 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
                     // --- DURUM VE ALARM MANTIĞI KONTROL MERKEZİ ---
                     const openTickets = safeArr(data.faults).filter(f => f.macId === m.id && f.status === "open");
                     
-                    // Sadece makineyi GERÇEKTEN durduran arıza veya operasyonel duruşları bul (Eğer arızaysa ve [ÇALIŞIYOR] etiketi Varsa yoksay)
                     const activeF = openTickets.find(f => f.type !== "is_emri" && !(f.type === "ariza" && String(f.desc).includes("[ÇALIŞIYOR]")));
-                    
-                    // Özel İş Emirleri (Tarihi gelmiş mi?)
                     const dueSpecialTask = openTickets.find(f => f.type === "is_emri" && new Date(f.start).getTime() <= todayMs);
                     const pendingSpecialTask = openTickets.find(f => f.type === "is_emri" && new Date(f.start).getTime() > todayMs);
                     
-                    // Kutu üstünde görünecek sebep ve tooltip açıklaması
                     let stopReason = activeF ? safeStr(activeF.reason) : "";
                     let openDesc = activeF ? cleanTag(activeF.desc) : ""; 
 
-                    // Renk ve Stil Değişkenleri
                     let cardPulseClass = "";
                     let cardBorderColor = "var(--border)";
                     let cardBg = "rgba(16,185,129,0.05)";
@@ -1635,7 +1758,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
                     let badgeBg = "#10b98120";
                     let badgeColor = "var(--green)";
 
-                    if (m.status === 'fault') { // Makine kırmızıya düşmüşse (Gerçek Arıza)
+                    if (m.status === 'fault') { 
                        cardPulseClass = 'pulse-fault';
                        cardBorderColor = 'var(--red)';
                        cardBg = 'rgba(239,68,68,0.15)';
@@ -1643,7 +1766,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
                        statusColor = 'var(--red)';
                        badgeBg = '#ef444420';
                        badgeColor = 'var(--red)';
-                    } else if (m.status === 'stopped') { // Makine turuncuya düşmüşse (Operasyonel Duruş)
+                    } else if (m.status === 'stopped') { 
                        cardPulseClass = 'pulse-stopped';
                        cardBorderColor = 'var(--amber)';
                        cardBg = 'rgba(245,158,11,0.15)';
@@ -1651,7 +1774,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
                        statusColor = 'var(--amber)';
                        badgeBg = '#f59e0b20';
                        badgeColor = 'var(--amber)';
-                    } else if (dueSpecialTask) { // Yeşil ama Özel Bakım Vakti Gelmiş (Hızlı Sarı Pulse)
+                    } else if (dueSpecialTask) { 
                        cardPulseClass = 'pulse-special-due';
                        cardBorderColor = '#eab308';
                        cardBg = 'rgba(234, 179, 8, 0.15)';
@@ -1661,7 +1784,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
                        badgeColor = '#eab308';
                        stopReason = "ÖZEL BAKIM ZAMANI";
                        openDesc = cleanTag(dueSpecialTask.desc);
-                    } else if (pendingSpecialTask) { // Yeşil ama İleri Tarihli Özel Bakım Var (Yavaş Sarı Pulse)
+                    } else if (pendingSpecialTask) { 
                        cardPulseClass = 'pulse-special-pending';
                        cardBorderColor = 'rgba(234, 179, 8, 0.6)';
                        cardBg = 'rgba(234, 179, 8, 0.05)';
@@ -1671,11 +1794,10 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
                        badgeColor = '#ca8a04';
                        stopReason = "PLANLI İŞ EMRİ";
                        openDesc = cleanTag(pendingSpecialTask.desc);
-                    } else { // Yemyeşil tıkır tıkır çalışıyor
-                       // Eğer çalışıyor ama "Arıza var fakat durdurmadı" dediyse (Checkbox kapalıysa)
+                    } else { 
                        const nonStoppingFault = openTickets.find(f => f.type === "ariza" && String(f.desc).includes("[ÇALIŞIYOR]"));
                        if (nonStoppingFault) {
-                          cardPulseClass = 'pulse-blue'; // MAVİ YANIP SÖNSÜN (ÇALIŞIYOR AMA KAYIT VAR)
+                          cardPulseClass = 'pulse-blue'; 
                           cardBorderColor = 'var(--blue)';
                           cardBg = 'rgba(59,130,246,0.1)';
                           statusLabel = "ÇALIŞIYOR (KAYIT VAR)";
@@ -1687,7 +1809,6 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
                        }
                     }
 
-                    // KUŞBAKIŞI GÖRÜNÜM (Açıklama artık Tooltip'te var)
                     if (viewMode === "grid") {
                       return (
                         <div key={m.id} className={`card ${cardPulseClass} clickable-card`}
@@ -1709,7 +1830,6 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
                       );
                     }
 
-                    // LİSTE GÖRÜNÜMÜ (Açıklama direkt altında yazar)
                     return (
                       <div key={m.id} className={`card ${cardPulseClass}`} style={{borderColor: (m.status!=="active" || dueSpecialTask || pendingSpecialTask) ? cardBorderColor : isChecked ? "var(--blue)" : "var(--border)", cursor:"pointer", background: cardBg}} onClick={()=>setSelMacDetail({mac:m, cat:cat})}>
                         <input type="checkbox" className="mac-check" checked={isChecked} onChange={(e)=>handleMacCheck(m, e.target.checked)} onClick={e=>e.stopPropagation()} title="Toplu Bakım için Seç" />
@@ -1765,7 +1885,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
             {activeFaults.filter(f => {
               const mac = safeArr(data.machines).find(m => m && m.id === f.macId);
               if (!mac) return false; 
-              if (listCatFilter && mac?.catId !== listCatFilter) return false;
+              if (listCatFilters.length > 0 && !listCatFilters.includes(mac?.catId)) return false;
               
               const mName = mac ? safeStr(mac.name).toLowerCase() : "";
               const term = openSearch.toLowerCase();
@@ -1793,20 +1913,62 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
       {tab === "maint" && (
         <ErrorBoundary>
           <div style={{display:"flex", flexDirection:"column", gap:10}}>
-            {maintenanceRadar.length === 0 && <div className="card" style={{textAlign:"center", color:"var(--dim)", padding:30}}>Yaklaşan veya geciken bakım yok.</div>}
-            {maintenanceRadar.filter(r => {
-              if (listCatFilter && r.mac?.catId !== listCatFilter) return false;
-              return safeStr(r.mac?.name).toLowerCase().includes(maintSearch.toLowerCase());
-            }).map((r, i) => (
-              <div key={i} className="card clickable-row" style={{borderLeft: `4px solid ${r.diffDays<0?"var(--red)":"var(--amber)"}`}} onClick={()=>setSelMacDetail({mac:r.mac, cat:r.cat})}>
-                <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                  <div><div style={{fontWeight:800, fontSize:16}}>{safeStr(r.mac?.name)} <span style={{fontSize:12, color:"var(--dim)", fontWeight:500}}>({safeStr(r.cat?.name)})</span></div><div style={{fontSize:13, color:"var(--blue)", marginTop:4}}>{safeStr(r.label)}</div></div>
-                  <div style={{textAlign:"right", fontWeight:900, fontSize:15, color:r.diffDays<0?"var(--red)":"var(--amber)"}}>
-                    {r.diffDays === -999 ? "HİÇ YAPILMADI!" : r.diffDays < 0 ? `${Math.abs(r.diffDays)} GÜN GECİKTİ!` : `${r.diffDays} Gün Kaldı`}
-                  </div>
-                </div>
-              </div>
-            ))}
+            
+            {(() => {
+                const filteredRadar = maintenanceRadar.filter(r => {
+                    if (listCatFilters.length > 0 && !listCatFilters.includes(r.mac?.catId)) return false;
+                    if (maintTplFilters.length > 0 && !maintTplFilters.includes(r.tplKey)) return false;
+                    return safeStr(r.mac?.name).toLowerCase().includes(maintSearch.toLowerCase());
+                });
+
+                return (
+                    <React.Fragment>
+                        {filteredRadar.length > 0 && (
+                            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", background:"var(--inp)", padding:"12px 16px", borderRadius:8, border:"1px solid var(--border)"}}>
+                                <label style={{display:"flex", alignItems:"center", gap:8, cursor:"pointer", color:"var(--text)", fontWeight:700}}>
+                                    <input type="checkbox" className="mac-check" style={{position:"relative", top:0, right:0}}
+                                           checked={maintBulkSelections.length === filteredRadar.length}
+                                           onChange={(e) => {
+                                               if(e.target.checked) setMaintBulkSelections([...filteredRadar]);
+                                               else setMaintBulkSelections([]);
+                                           }} />
+                                    Listelenen Tümünü Seç ({filteredRadar.length})
+                                </label>
+                                {maintBulkSelections.length > 0 && (
+                                    <button className="btn btn-green" onClick={()=>checkPw(()=>setShowBulkCloseModal(true))}>
+                                        ⚡ Seçili ({maintBulkSelections.length}) Bakımı Yap
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        {filteredRadar.length === 0 && <div className="card" style={{textAlign:"center", color:"var(--dim)", padding:30}}>Yaklaşan veya geciken bakım yok.</div>}
+
+                        {filteredRadar.map((r, i) => {
+                            const isChecked = maintBulkSelections.some(x => x.mac.id === r.mac?.id && x.tplKey === r.tplKey);
+                            return (
+                                <div key={i} className="card clickable-row" style={{borderLeft: `4px solid ${r.diffDays<0?"var(--red)":"var(--amber)"}`, display:"flex", alignItems:"center", gap:14}} onClick={()=>setSelMacDetail({mac:r.mac, cat:r.cat})}>
+                                    <div onClick={e=>e.stopPropagation()}>
+                                        <input type="checkbox" className="mac-check" style={{position:"relative", top:0, right:0}}
+                                               checked={isChecked}
+                                               onChange={(e) => {
+                                                   if(e.target.checked) setMaintBulkSelections([...maintBulkSelections, r]);
+                                                   else setMaintBulkSelections(maintBulkSelections.filter(x => !(x.mac.id === r.mac.id && x.tplKey === r.tplKey)));
+                                               }} />
+                                    </div>
+                                    <div style={{flex:1, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                                        <div><div style={{fontWeight:800, fontSize:16}}>{safeStr(r.mac?.name)} <span style={{fontSize:12, color:"var(--dim)", fontWeight:500}}>({safeStr(r.cat?.name)})</span></div><div style={{fontSize:13, color:"var(--blue)", marginTop:4}}>{safeStr(r.label)}</div></div>
+                                        <div style={{textAlign:"right", fontWeight:900, fontSize:15, color:r.diffDays<0?"var(--red)":"var(--amber)"}}>
+                                            {r.diffDays === -999 ? "HİÇ YAPILMADI!" : r.diffDays < 0 ? `${Math.abs(r.diffDays)} GÜN GECİKTİ!` : `${r.diffDays} Gün Kaldı`}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </React.Fragment>
+                );
+            })()}
+
           </div>
         </ErrorBoundary>
       )}
@@ -1910,6 +2072,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
       )}
 
       {showBulkModal && <BulkMaintModal selectedMacs={bulkMacs} data={data} sendData={sendData} onClose={() => {setShowBulkModal(false); setBulkMacs([]); fetchData(true);}} />}
+      {showBulkCloseModal && <BulkCloseMaintModal selectedTasks={maintBulkSelections} sendData={sendData} onClose={() => {setShowBulkCloseModal(false); setMaintBulkSelections([]); fetchData(true);}} />}
       {selMacDetail && <MachineDetailModal mac={selMacDetail.mac} cat={selMacDetail.cat} data={data} onClose={()=>setSelMacDetail(null)} sendData={sendData} checkPw={checkPw} settings={settings} />}
     </div>
   );
@@ -2199,19 +2362,19 @@ function App() {
           const mnts = safeArr(resp.data.maintenance).slice(1).map(r => ({ id: r[0], macId: r[1], type: r[2], by: r[3], date: r[4], checks: r[5], notes: r[6] }));
           
           macs = macs.map(m => {
-             const openF = flts.filter(f => f.macId === m.id && f.status === "open");
-             let isStopped = false, isFault = false;
-             openF.forEach(f => {
-                 if (f.type === "durus") isStopped = true;
-                 if (f.type === "ariza" && !String(f.desc).includes("[ÇALIŞIYOR]")) isFault = true;
-             });
-             
-             let realStatus = "active"; 
-             
-             if (isFault) realStatus = "fault"; 
-             else if (isStopped) realStatus = "stopped"; 
-             
-             return { ...m, status: realStatus };
+              const openF = flts.filter(f => f.macId === m.id && f.status === "open");
+              let isStopped = false, isFault = false;
+              openF.forEach(f => {
+                  if (f.type === "durus") isStopped = true;
+                  if (f.type === "ariza" && !String(f.desc).includes("[ÇALIŞIYOR]")) isFault = true;
+              });
+              
+              let realStatus = "active"; 
+              
+              if (isFault) realStatus = "fault"; 
+              else if (isStopped) realStatus = "stopped"; 
+              
+              return { ...m, status: realStatus };
           });
 
           setData({ categories: cats, machines: macs, faults: flts, maintenance: mnts });
