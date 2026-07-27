@@ -542,7 +542,7 @@ const BulkMaintModal = ({ selectedMacs, data, onClose, sendData }) => {
     return (commonKeys || []).map(k => [k, labels[k]]);
   }, [selectedMacs, data.categories]);
 
-  // Ortak duruş sebeplerini bulmak için (Sadece seçili makinelerin kategorilerindeki ortak sebepleri bulur)
+  // Ortak duruş sebeplerini bulmak için
   const availableReasons = useMemo(() => {
       if (!selectedMacs || selectedMacs.length === 0) return [];
       let commonReasons = null;
@@ -591,9 +591,8 @@ const BulkMaintModal = ({ selectedMacs, data, onClose, sendData }) => {
               }
           }
       } else {
-          // Arıza veya Duruş Kaydı
           let finalDesc = notes;
-          if (tab === "ariza") finalDesc = "[MAKİNE DURDU]\n" + notes; // Toplu arıza giriliyorsa durdu varsayılır
+          if (tab === "ariza") finalDesc = "[MAKİNE DURDU]\n" + notes; 
           
           await sendData("report_fault", { 
               id: "FLT-"+uid(), machineId: m.id, type: tab, 
@@ -697,7 +696,6 @@ const BulkCloseMaintModal = ({ selectedTasks, onClose, sendData }) => {
       const task = selectedTasks[i];
       if(!task || !task.mac) continue;
 
-      // Tüm kontrol maddeleri eksiksiz işaretlenmiş varsayılır
       const allItems = safeArr(task.items).join(", ");
       await sendData("log_maint", {
         id: "MNT-"+uid(), machineId: task.mac.id, maintType: task.tplKey,
@@ -1590,7 +1588,6 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
     };
 
     if (type === 'faults') {
-      // Tam istediğin sıradaki başlıklar
       csvContent += ["Makine Numarası", "Bölüm", "Kayıt Tipi", "Arızanın Tanımı", "Arıza Detayları", "Başlangıç Tarihi", "Bitiş Tarihi", "Duruş Süresi (Dk)", "Yapılan İşlemler", "Arızayı Açan", "Arızayı Kapatan", "Değişen Parça", "Mevcut Durum"].join(sep) + "\n";
       
       safeArr(data.faults).forEach(f => {
@@ -1621,7 +1618,6 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
       });
 
     } else if (type === 'maint') {
-      // Bakım raporunu da aynı düzende, Excel'e uygun hale getirdik
       csvContent += ["Makine Numarası", "Bölüm", "Bakım Türü", "Tarih", "Yapan Kişi", "İşaretlenen Kontroller", "Notlar"].join(sep) + "\n";
       
       safeArr(data.maintenance).forEach(m => {
@@ -1646,17 +1642,73 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
         
         csvContent += row + "\n";
       });
+      
+    } else if (type === 'oil') {
+        // YAĞ DEĞİŞİM RAPORU MANTIĞI
+        csvContent += ["Bölüm / Makine", "Yağ Değişim Tarihleri (Eskiden Yeniye ->)"].join(sep) + "\n\n";
+
+        safeArr(data.categories).forEach(cat => {
+            if (!cat) return;
+            const macsInCat = safeArr(data.machines).filter(m => m && m.catId === cat.id);
+            if (macsInCat.length === 0) return;
+
+            // Bölüm Başlığı
+            csvContent += escapeField(`--- ${safeStr(cat.name).toUpperCase()} BÖLÜMÜ ---`) + "\n";
+
+            macsInCat.forEach(mac => {
+                const oilDates = [];
+                safeArr(data.maintenance).forEach(m => {
+                    if (m && m.macId === mac.id) {
+                        const hasCustomTpl = mac.templates && Object.keys(safeObj(mac.templates)).length > 0;
+                        const tpls = safeObj(hasCustomTpl ? mac.templates : (cat.templates || {}));
+                        let tName = m.type;
+                        if (tpls[m.type] && tpls[m.type].label) tName = tpls[m.type].label;
+                        
+                        const nameLower = safeStr(tName).toLowerCase();
+                        if (nameLower.includes("yağ") || nameLower.includes("yag") || nameLower.includes("oil")) {
+                            if (m.date) {
+                                const dt = new Date(m.date);
+                                if (!isNaN(dt.getTime())) oilDates.push(dt);
+                            }
+                        }
+                    }
+                });
+
+                // Eskiden Yeniye Sıralama
+                oilDates.sort((a, b) => a.getTime() - b.getTime());
+
+                // Tarihleri DD.MM.YYYY formatına getirme (fd fonksiyonumuz sadece tarihi verir true parametresiyle)
+                const formattedDates = oilDates.map(dt => fd(dt, true));
+
+                // Satırın inşası
+                const rowCells = [escapeField(mac.name)];
+                if (formattedDates.length > 0) {
+                    rowCells.push(...formattedDates.map(escapeField));
+                } else {
+                    rowCells.push(escapeField("Kayıt Yok"));
+                }
+                
+                csvContent += rowCells.join(sep) + "\n";
+            });
+            csvContent += "\n"; // Kategoriler arası estetik boşluk
+        });
     }
 
     // Dosyayı İndirme İşlemi
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `ProX_${type === 'faults' ? 'Ariza_Raporu' : 'Bakim_Raporu'}_${toYMD(new Date())}.csv`;
+    let fName = "Rapor";
+    if (type === 'faults') fName = "Ariza_Raporu";
+    else if (type === 'maint') fName = "Bakim_Raporu";
+    else if (type === 'oil') fName = "Yag_Degisim_Raporu";
+    link.download = `ProX_${fName}_${toYMD(new Date())}.csv`;
+    
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
+  
   const handleMacCheck = (mac, checked) => {
     if(checked) setBulkMacs([...bulkMacs, mac]);
     else setBulkMacs(bulkMacs.filter(m => m.id !== mac.id));
@@ -2019,6 +2071,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
                <div style={{display:"flex", gap:10, flexWrap:"wrap"}}>
                   <button className="btn btn-ghost" onClick={()=>downloadCSV('faults')}>⬇️ Arıza & Duruş Raporunu İndir</button>
                   <button className="btn btn-ghost" onClick={()=>downloadCSV('maint')}>⬇️ Planlı Bakım Raporunu İndir</button>
+                  <button className="btn btn-ghost" onClick={()=>downloadCSV('oil')}>⬇️ Yağ Değişim Raporunu İndir</button>
                </div>
                <div style={{fontSize:11, color:"var(--mute)", marginTop:8}}>* İndirilen dosyayı Excel'de açarak gelişmiş filtrelemeler yapabilirsiniz.</div>
             </div>
