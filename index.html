@@ -863,8 +863,11 @@ const MachineManagerModal = ({ mac, categories, onClose, sendData }) => {
   const handleSave = async () => {
     if(!catId || !form.name) return alert("Kategori ve Ad zorunludur!");
     const payload = { id: isEdit ? mac.id : "MAC-"+uid(), categoryId: catId, name: form.name, brand: form.brand, model: form.model, status: form.status, templates: JSON.stringify(customTemplates) };
-    const success = await sendData(isEdit ? "update_machine" : "add_machine", payload);
-    if(success) onClose();
+    const success = await sendData(isEdit ? "update_category" : "add_machine", payload);
+    // Not: api isteği için payload action add_machine veya update_machine.
+    // Düzeltildi ->
+    const successVal = await sendData(isEdit ? "update_machine" : "add_machine", payload);
+    if(successVal) onClose();
   };
 
   const handleDelete = async () => {
@@ -1644,53 +1647,74 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
       });
       
     } else if (type === 'oil') {
-        // YAĞ DEĞİŞİM RAPORU MANTIĞI
+        // --- HATASIZ YAĞ DEĞİŞİM RAPORU MANTIĞI ---
         csvContent += ["Bölüm / Makine", "Yağ Değişim Tarihleri (Eskiden Yeniye ->)"].join(sep) + "\n\n";
 
         safeArr(data.categories).forEach(cat => {
             if (!cat) return;
-            const macsInCat = safeArr(data.machines).filter(m => m && m.catId === cat.id);
-            if (macsInCat.length === 0) return;
+            const validRows = []; // Bu kategori için yazdırılacak satırları tutar
 
-            // Bölüm Başlığı
-            csvContent += escapeField(`--- ${safeStr(cat.name).toUpperCase()} BÖLÜMÜ ---`) + "\n";
+            safeArr(data.machines).filter(m => m && m.catId === cat.id).forEach(mac => {
+                const hasCustomTpl = mac.templates && Object.keys(safeObj(mac.templates)).length > 0;
+                const tpls = safeObj(hasCustomTpl ? mac.templates : (cat.templates || {}));
+                
+                // 1. Makinede aktif bir yağ değişim şablonu var mı kontrol et
+                let hasOilTpl = false;
+                Object.entries(tpls).forEach(([k, v]) => {
+                   const kLower = String(k).toLowerCase();
+                   const lblLower = v && v.label ? String(v.label).toLowerCase() : "";
+                   if (kLower.includes("yağ") || kLower.includes("yag") || kLower.includes("oil") ||
+                       lblLower.includes("yağ") || lblLower.includes("yag") || lblLower.includes("oil")) {
+                       hasOilTpl = true;
+                   }
+                });
 
-            macsInCat.forEach(mac => {
-                const oilDates = [];
+                const oilRecords = [];
+                // 2. Makinenin bakım geçmişini kontrol et (Şablon silinmiş olsa bile geçmiş yağ bakımlarını bulur)
                 safeArr(data.maintenance).forEach(m => {
                     if (m && m.macId === mac.id) {
-                        const hasCustomTpl = mac.templates && Object.keys(safeObj(mac.templates)).length > 0;
-                        const tpls = safeObj(hasCustomTpl ? mac.templates : (cat.templates || {}));
                         let tName = m.type;
                         if (tpls[m.type] && tpls[m.type].label) tName = tpls[m.type].label;
                         
                         const nameLower = safeStr(tName).toLowerCase();
-                        if (nameLower.includes("yağ") || nameLower.includes("yag") || nameLower.includes("oil")) {
-                            if (m.date) {
-                                const dt = new Date(m.date);
-                                if (!isNaN(dt.getTime())) oilDates.push(dt);
+                        const typeLower = safeStr(m.type).toLowerCase();
+                        
+                        if (nameLower.includes("yağ") || nameLower.includes("yag") || nameLower.includes("oil") ||
+                            typeLower.includes("yağ") || typeLower.includes("yag") || typeLower.includes("oil")) {
+                            
+                            const ts = safeTime(m.date);
+                            if (ts > 0) {
+                                // Objeyi tutuyoruz ki fd fonksiyonuna saf stringi gönderip tire (-) hatasını engelleyebilelim
+                                oilRecords.push({ ts: ts, dateStr: m.date });
                             }
                         }
                     }
                 });
 
-                // Eskiden Yeniye Sıralama
-                oilDates.sort((a, b) => a.getTime() - b.getTime());
+                // Eğer aktif bir yağ şablonu YADA geçmişte yapılmış yağ bakımı varsa bu makineyi listeye dahil et
+                if (hasOilTpl || oilRecords.length > 0) {
+                    // Eskiden Yeniye Sıralama
+                    oilRecords.sort((a, b) => a.ts - b.ts);
+                    
+                    // Tarihleri formatlama (Tire (-) hatasını önlemek için dateStr parametresi kullanıldı)
+                    const formattedDates = oilRecords.map(r => fd(r.dateStr, true));
 
-                // Tarihleri DD.MM.YYYY formatına getirme (fd fonksiyonumuz sadece tarihi verir true parametresiyle)
-                const formattedDates = oilDates.map(dt => fd(dt, true));
-
-                // Satırın inşası
-                const rowCells = [escapeField(mac.name)];
-                if (formattedDates.length > 0) {
-                    rowCells.push(...formattedDates.map(escapeField));
-                } else {
-                    rowCells.push(escapeField("Kayıt Yok"));
+                    const rowCells = [escapeField(mac.name)];
+                    if (formattedDates.length > 0) {
+                        rowCells.push(...formattedDates.map(escapeField));
+                    } else {
+                        rowCells.push(escapeField("Kayıt Yok")); // Sadece şablonu olup henüz yağ değişmeyenler için "Kayıt Yok" yazar
+                    }
+                    
+                    validRows.push(rowCells.join(sep));
                 }
-                
-                csvContent += rowCells.join(sep) + "\n";
             });
-            csvContent += "\n"; // Kategoriler arası estetik boşluk
+
+            // Eğer bu kategoride yağ ile ilgili hiçbir makine yoksa kategori başlığını hiç yazdırma
+            if (validRows.length > 0) {
+                csvContent += escapeField(`--- ${safeStr(cat.name).toUpperCase()} BÖLÜMÜ ---`) + "\n";
+                csvContent += validRows.join("\n") + "\n\n";
+            }
         });
     }
 
