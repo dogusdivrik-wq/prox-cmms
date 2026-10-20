@@ -87,7 +87,7 @@ tr:hover td{background:rgba(255,255,255,0.03);}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
 <script type="text/babel">
-const { useState, useEffect, useMemo } = React;
+const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
 // ⚠️ BURAYA KENDİ DAĞITIM URL'NİZİ YAPIŞTIRIN!
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz6SLmqw-gyU0Ay5rnAwez7sqdL0B-3aZI2AbE8fMYJpJhfqLeh4N_QdKcFHLEeoQxl/exec";
@@ -160,6 +160,141 @@ const safeObj = (v) => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {
 const safeStr = (v) => (v === null || v === undefined) ? "" : String(v);
 
 const cleanTag = (str) => safeStr(str).replace(/\[MAKİNE DURDU\]\n?/g, "").replace(/\[ÇALIŞIYOR\]\n?/g, "");
+
+// --- VERİ HAZIRLAMA, İNDEKS VE YEREL ÖNBELLEK ---
+// Otomatik yenileme sıklığı. Daha sık veri için 60000, daha az yük için 900000 yapılabilir.
+const SYNC_INTERVAL_MS = 5 * 60 * 1000;
+const CACHE_DB = "prox-cache";
+const CACHE_STORE = "snapshot";
+const CACHE_VERSION = 1;
+
+const hashStr = (str) => {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(36) + "-" + str.length;
+};
+
+const fmtSync = (d) => {
+  if (!d) return "";
+  const time = d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) return time;
+  return d.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit" }) + " " + time;
+};
+
+const buildData = (raw) => {
+  const d = raw || {};
+  const cats = safeArr(d.categories).slice(1).map(r => ({
+    id: r[0], name: r[1],
+    reasons: safeArr(parseJSON(r[2], [])),
+    templates: safeObj(parseJSON(r[3], {}))
+  }));
+  let macs = safeArr(d.machines).slice(1).map(r => ({
+    id: r[0], catId: r[1], name: r[2], brand: r[3], model: r[4],
+    status: r[5], templates: safeObj(parseJSON(r[6], {}))
+  }));
+  const flts = safeArr(d.faults).slice(1).map(r => ({
+    id: r[0], macId: r[1], type: r[2], reason: r[3], desc: r[4], by: r[5],
+    start: r[6], status: r[7], closedBy: r[8], closeNote: r[9],
+    materials: r[10], end: r[11], downtime: r[12]
+  }));
+  const mnts = safeArr(d.maintenance).slice(1).map(r => ({
+    id: r[0], macId: r[1], type: r[2], by: r[3], date: r[4], checks: r[5], notes: r[6]
+  }));
+
+  const openByMac = new Map();
+  flts.forEach(f => {
+    if (!f || f.status !== "open") return;
+    if (!openByMac.has(f.macId)) openByMac.set(f.macId, []);
+    openByMac.get(f.macId).push(f);
+  });
+
+  macs = macs.map(m => {
+    const openF = openByMac.get(m.id) || [];
+    let isStopped = false, isFault = false;
+    openF.forEach(f => {
+      if (f.type === "durus") isStopped = true;
+      if (f.type === "ariza" && !String(f.desc).includes("[ÇALIŞIYOR]")) isFault = true;
+    });
+    return { ...m, status: isFault ? "fault" : isStopped ? "stopped" : "active" };
+  });
+
+  return { categories: cats, machines: macs, faults: flts, maintenance: mnts };
+};
+
+const buildDataIndex = (data) => {
+  const catById = new Map();
+  safeArr(data.categories).forEach(c => { if (c) catById.set(c.id, c); });
+
+  const faultsByMac = new Map();
+  const openFaultsByMac = new Map();
+  safeArr(data.faults).forEach(f => {
+    if (!f) return;
+    if (!faultsByMac.has(f.macId)) faultsByMac.set(f.macId, []);
+    faultsByMac.get(f.macId).push(f);
+    if (f.status === "open") {
+      if (!openFaultsByMac.has(f.macId)) openFaultsByMac.set(f.macId, []);
+      openFaultsByMac.get(f.macId).push(f);
+    }
+  });
+  faultsByMac.forEach(list => list.sort((a, b) => safeTime(b.start) - safeTime(a.start)));
+
+  const maintByMac = new Map();
+  const lastMaint = new Map();
+  safeArr(data.maintenance).forEach(m => {
+    if (!m) return;
+    if (!maintByMac.has(m.macId)) maintByMac.set(m.macId, []);
+    maintByMac.get(m.macId).push(m);
+    const k = m.macId + "|" + m.type;
+    const prev = lastMaint.get(k);
+    if (!prev || safeTime(m.date) > safeTime(prev.date)) lastMaint.set(k, m);
+  });
+  maintByMac.forEach(list => list.sort((a, b) => safeTime(b.date) - safeTime(a.date)));
+
+  return {
+    catById, faultsByMac, openFaultsByMac, maintByMac, lastMaint,
+    openFaults: safeArr(data.faults).filter(f => f && f.status === "open")
+  };
+};
+
+const useDataIndex = (data) => useMemo(
+  () => buildDataIndex(data),
+  [data.categories, data.faults, data.maintenance]
+);
+
+const idbOpen = () => new Promise((resolve, reject) => {
+  if (typeof indexedDB === "undefined") { reject(new Error("indexedDB yok")); return; }
+  const req = indexedDB.open(CACHE_DB, 1);
+  req.onupgradeneeded = () => {
+    const db = req.result;
+    if (!db.objectStoreNames.contains(CACHE_STORE)) db.createObjectStore(CACHE_STORE);
+  };
+  req.onsuccess = () => resolve(req.result);
+  req.onerror = () => reject(req.error);
+});
+
+const cacheGet = async () => {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(CACHE_STORE, "readonly");
+    const req = tx.objectStore(CACHE_STORE).get("main");
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+};
+
+const cacheSet = async (value) => {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(CACHE_STORE, "readwrite");
+    tx.objectStore(CACHE_STORE).put(value, "main");
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+  });
+};
 
 const InfoBtn = ({ msg }) => (
   <span className="info-icon" title={msg} onClick={e => e.stopPropagation()}>?</span>
@@ -258,6 +393,7 @@ const SettingsModal = ({ settings, onClose, onSave }) => {
 // --- LİDERLİK TABLOSU ---
 const LeaderboardModal = ({ type, data, filtMonth, onClose, onSelectMac }) => {
   const [filtCat, setFiltCat] = useState("");
+  const idx = useDataIndex(data);
 
   const rankedList = useMemo(() => {
     let macs = safeArr(data.machines);
@@ -266,8 +402,8 @@ const LeaderboardModal = ({ type, data, filtMonth, onClose, onSelectMac }) => {
     return macs.map(mac => {
       if (!mac) return null;
       let totalMins = 0, fCount = 0;
-      safeArr(data.faults).forEach(f => {
-        if (f && f.macId === mac.id && f.status === "closed" && f.type !== "bakim" && f.type !== "is_emri") {
+      safeArr(idx.faultsByMac.get(mac.id)).forEach(f => {
+        if (f && f.status === "closed" && f.type !== "bakim" && f.type !== "is_emri") {
           if (filtMonth && f.end && !toYMD(f.end).startsWith(filtMonth)) return;
           totalMins += (Number(f.downtime) || 0);
           if (f.type === "ariza") fCount++;
@@ -276,7 +412,7 @@ const LeaderboardModal = ({ type, data, filtMonth, onClose, onSelectMac }) => {
       return { ...mac, totalMins, fCount };
     }).filter(m => m && (type === 'downtime' ? m.totalMins > 0 : m.fCount > 0))
       .sort((a, b) => type === 'downtime' ? b.totalMins - a.totalMins : b.fCount - a.fCount);
-  }, [data.machines, data.faults, filtCat, filtMonth, type]);
+  }, [data.machines, idx, filtCat, filtMonth, type]);
 
   return (
     <div className="overlay" style={{zIndex:3500}} onClick={onClose}>
@@ -863,11 +999,8 @@ const MachineManagerModal = ({ mac, categories, onClose, sendData }) => {
   const handleSave = async () => {
     if(!catId || !form.name) return alert("Kategori ve Ad zorunludur!");
     const payload = { id: isEdit ? mac.id : "MAC-"+uid(), categoryId: catId, name: form.name, brand: form.brand, model: form.model, status: form.status, templates: JSON.stringify(customTemplates) };
-    const success = await sendData(isEdit ? "update_category" : "add_machine", payload);
-    // Not: api isteği için payload action add_machine veya update_machine.
-    // Düzeltildi ->
-    const successVal = await sendData(isEdit ? "update_machine" : "add_machine", payload);
-    if(successVal) onClose();
+    const success = await sendData(isEdit ? "update_machine" : "add_machine", payload);
+    if(success) onClose();
   };
 
   const handleDelete = async () => {
@@ -1025,26 +1158,37 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw, settin
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [selRecord, setSelRecord] = useState(null);
+  const [faultLimit, setFaultLimit] = useState(20);
+  const [maintLimit, setMaintLimit] = useState(20);
+  const [partsLimit, setPartsLimit] = useState(50);
+
+  const idx = useDataIndex(data);
+
+  useEffect(() => {
+    setFaultLimit(20);
+    setMaintLimit(20);
+    setPartsLimit(50);
+  }, [mac?.id, startDate, endDate]);
 
   const filteredFaults = useMemo(() => {
-    return safeArr(data.faults).filter(f => {
-      if(!f || f.macId !== mac?.id) return false;
+    return safeArr(idx.faultsByMac.get(mac?.id)).filter(f => {
+      if(!f) return false;
       const d = f.start ? toYMD(f.start) : ""; 
       if(startDate && d && d < startDate) return false;
       if(endDate && d && d > endDate) return false;
       return true;
-    }).sort((a,b) => safeTime(b.start) - safeTime(a.start)); 
-  }, [mac?.id, data.faults, startDate, endDate]);
+    });
+  }, [mac?.id, idx, startDate, endDate]);
 
   const filteredMaint = useMemo(() => {
-    return safeArr(data.maintenance).filter(m => {
-      if(!m || m.macId !== mac?.id) return false;
+    return safeArr(idx.maintByMac.get(mac?.id)).filter(m => {
+      if(!m) return false;
       const d = m.date ? toYMD(m.date) : ""; 
       if(startDate && d && d < startDate) return false;
       if(endDate && d && d > endDate) return false;
       return true;
-    }).sort((a,b) => safeTime(b.date) - safeTime(a.date)); 
-  }, [mac?.id, data.maintenance, startDate, endDate]);
+    });
+  }, [mac?.id, idx, startDate, endDate]);
 
   const filteredStats = useMemo(() => {
     let downTotal = 0, faultCount = 0, opCount = 0, faultMins = 0;
@@ -1083,8 +1227,8 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw, settin
 
     let downToday = 0, downMonth = 0, downTotal = 0;
 
-    safeArr(data.faults).forEach(f => {
-      if(f && f.macId === mac?.id && f.type !== "bakim" && f.type !== "is_emri") {
+    safeArr(idx.faultsByMac.get(mac?.id)).forEach(f => {
+      if(f && f.type !== "bakim" && f.type !== "is_emri") {
         let fStart = safeTime(f.start);
         let fEnd = (f.status === "closed" && f.end) ? safeTime(f.end) : now.getTime();
         
@@ -1107,7 +1251,7 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw, settin
     });
 
     return { downToday: Math.round(downToday), downMonth: Math.round(downMonth), downTotal: Math.round(downTotal) };
-  }, [mac?.id, data.faults, settings]);
+  }, [mac?.id, idx, settings]);
 
   const trackers = useMemo(() => {
     const hasCustomTpl = mac?.templates && Object.keys(safeObj(mac.templates)).length > 0;
@@ -1117,8 +1261,7 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw, settin
 
     Object.entries(tpls).forEach(([key, tpl]) => {
       if(!tpl || typeof tpl !== 'object') return; 
-      const pastMaint = safeArr(data.maintenance).filter(m => m && m.macId === mac?.id && m.type === key).sort((a,b) => safeTime(b.date) - safeTime(a.date));
-      const last = pastMaint[0];
+      const last = idx.lastMaint.get(mac?.id + "|" + key);
       let nextDateMs = null, diffDays = null, isOverdue = false, statusText = "Yapılmadı", progress = 0;
 
       if(last && last.date) {
@@ -1135,7 +1278,7 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw, settin
       results.push({ key, label: safeStr(tpl.label), period: Number(tpl.periodDays)||0, last, nextDateMs, diffDays, isOverdue, statusText, progress });
     });
     return results.sort((a,b) => (a.diffDays === null ? -999 : a.diffDays) - (b.diffDays === null ? -999 : b.diffDays));
-  }, [mac, cat, data.maintenance]);
+  }, [mac, cat, idx]);
 
   const topParts = useMemo(() => {
     const partsHistory = filteredFaults.filter(f => f && f.materials && f.materials.trim() !== "");
@@ -1151,7 +1294,12 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw, settin
     return Object.values(counts).sort((a,b) => b.count - a.count);
   }, [filteredFaults]);
 
-  const activeTickets = safeArr(data.faults).filter(f => f && f.macId === mac?.id && f.status === "open");
+  const partsList = useMemo(
+    () => filteredFaults.filter(f => f && f.materials && f.materials.trim() !== ""),
+    [filteredFaults]
+  );
+
+  const activeTickets = idx.openFaultsByMac.get(mac?.id) || [];
 
   return (
     <div className="overlay" onClick={onClose} style={{zIndex:2000}}>
@@ -1285,7 +1433,7 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw, settin
                      <thead style={{background:"var(--inp)", position:"sticky", top:0}}><tr><th>Tip</th><th>Sebep</th><th>Tarih</th><th>Kapatan</th><th>İşlem</th><th>Dk</th></tr></thead>
                       <tbody>
                         {filteredFaults.length === 0 && <tr><td colSpan="6" style={{textAlign:"center", color:"var(--dim)"}}>Kayıt yok</td></tr>}
-                        {filteredFaults.map(f => (
+                        {filteredFaults.slice(0, faultLimit).map(f => (
                          <tr key={f.id} className="clickable-row" onClick={() => setSelRecord({type: "fault", data: f})}>
                            <td>{f.type==="ariza"?"🔴":f.type==="is_emri"?"📅":"🟠"}</td>
                            <td style={{fontWeight:600}}>{safeStr(f.reason)}</td>
@@ -1297,6 +1445,12 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw, settin
                         ))}
                       </tbody>
                     </table>
+                    {filteredFaults.length > faultLimit && (
+                      <button className="btn btn-ghost btn-sm" style={{width:"100%", justifyContent:"center", margin:"6px 0"}}
+                        onClick={() => setFaultLimit(v => v + 50)}>
+                        Daha fazla göster ({filteredFaults.length - faultLimit} kayıt)
+                      </button>
+                    )}
                   </div>
 
                   <div className="lbl" style={{color:"var(--green)"}}>Yapılan Bakımlar (Detay için tıkla) <InfoBtn msg="Makineye bugüne kadar uygulanan planlı bakımların listesi." /></div>
@@ -1305,7 +1459,7 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw, settin
                       <thead style={{background:"var(--inp)", position:"sticky", top:0}}><tr><th>Bakım Tipi</th><th>Yapan</th><th>Tarih</th><th style={{textAlign:"right"}}>Kontrol Oranı <InfoBtn msg="Şablondaki maddelerin yüzde kaçının işaretlendiğini gösterir."/></th></tr></thead>
                       <tbody>
                         {filteredMaint.length === 0 && <tr><td colSpan="4" style={{textAlign:"center", color:"var(--dim)"}}>Kayıt yok</td></tr>}
-                        {filteredMaint.map(m => {
+                        {filteredMaint.slice(0, maintLimit).map(m => {
                           const hasCustomTpl = mac?.templates && Object.keys(safeObj(mac.templates)).length > 0;
                           const tpls = safeObj(hasCustomTpl ? mac.templates : (cat?.templates || {}));
                           const tpl = tpls[m.type];
@@ -1330,6 +1484,12 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw, settin
                         })}
                       </tbody>
                     </table>
+                    {filteredMaint.length > maintLimit && (
+                      <button className="btn btn-ghost btn-sm" style={{width:"100%", justifyContent:"center", margin:"6px 0"}}
+                        onClick={() => setMaintLimit(v => v + 50)}>
+                        Daha fazla göster ({filteredMaint.length - maintLimit} kayıt)
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1357,8 +1517,8 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw, settin
                     <table>
                       <thead style={{background:"var(--inp)", position:"sticky", top:0}}><tr><th>Değişen Parça / Malzeme Bilgisi</th><th>Tarih</th><th>Bakımcı</th></tr></thead>
                       <tbody>
-                        {filteredFaults.filter(f => f.materials && f.materials.trim() !== "").length === 0 && <tr><td colSpan="3" style={{textAlign:"center", color:"var(--dim)"}}>Seçili dönemde parça kaydı yok.</td></tr>}
-                        {filteredFaults.filter(f => f.materials && f.materials.trim() !== "").map(f => (
+                        {partsList.length === 0 && <tr><td colSpan="3" style={{textAlign:"center", color:"var(--dim)"}}>Seçili dönemde parça kaydı yok.</td></tr>}
+                        {partsList.slice(0, partsLimit).map(f => (
                           <tr key={f.id} className="clickable-row" onClick={() => setSelRecord({type: "fault", data: f})}>
                             <td style={{fontWeight:700, color:"var(--amber)"}}>{f.materials}</td>
                             <td style={{fontSize:12, color:"var(--dim)"}}>{fd(f.end)}</td>
@@ -1367,6 +1527,12 @@ const MachineDetailModal = ({ mac, cat, data, onClose, sendData, checkPw, settin
                         ))}
                       </tbody>
                     </table>
+                    {partsList.length > partsLimit && (
+                      <button className="btn btn-ghost btn-sm" style={{width:"100%", justifyContent:"center", margin:"6px 0"}}
+                        onClick={() => setPartsLimit(v => v + 50)}>
+                        Daha fazla göster ({partsList.length - partsLimit} kayıt)
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1419,7 +1585,7 @@ const QRPage = ({ data, setPg }) => {
 };
 
 // --- DASHBOARD (YÖNETİCİ EKRANI) ---
-const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, settings }) => {
+const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, settings, lastSync }) => {
   const [tab, setTab] = useState("overview"); 
   const [selMacDetail, setSelMacDetail] = useState(null);
   
@@ -1440,7 +1606,8 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
   const [leaderboardType, setLeaderboardType] = useState(null);
   const [viewMode, setViewMode] = useState("list");
 
-  const activeFaults = safeArr(data.faults).filter(f => f && f.status === "open" && safeArr(data.machines).some(m => m && m.id === f.macId));
+  const idx = useDataIndex(data);
+  const activeFaults = idx.openFaults.filter(f => f && safeArr(data.machines).some(m => m && m.id === f.macId));
 
   // Tesisdeki tüm bakım şablonlarını benzersiz olarak çıkarır (Bakım Türü filtresi için)
   const allTpls = useMemo(() => {
@@ -1459,7 +1626,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
     const todayMs = Date.now();
     safeArr(data.machines).forEach(mac => {
       if(!mac) return;
-      const cat = safeArr(data.categories).find(c => c && c.id === mac.catId);
+      const cat = idx.catById.get(mac.catId);
       if(!cat) return;
       
       const hasCustomTpl = mac.templates && Object.keys(safeObj(mac.templates)).length > 0;
@@ -1468,7 +1635,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
       Object.entries(tpls).forEach(([key, tpl]) => {
         if(!tpl || typeof tpl !== 'object') return; 
 
-        const last = safeArr(data.maintenance).filter(m => m && m.macId === mac.id && m.type === key).sort((a,b)=>safeTime(b.date)-safeTime(a.date))[0];
+        const last = idx.lastMaint.get(mac.id + "|" + key);
         let diffDays = -999;
         const pDays = Number(tpl.periodDays)||0;
         
@@ -1487,7 +1654,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
       });
     });
     return alerts.sort((a,b) => a.diffDays - b.diffDays);
-  }, [data.machines, data.categories, data.maintenance]);
+  }, [data.machines, idx]);
 
   const analytics = useMemo(() => {
     let targetMacs = safeArr(data.machines);
@@ -1505,9 +1672,11 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
       let faultDates = [];
       let oilDates = []; 
 
-      safeArr(data.faults).filter(f => f && f.macId === mac.id && f.status === "closed" && f.type !== "bakim" && f.type !== "is_emri").forEach(f => {
-        if(filtMonth && f.end) {
-          const ymd = toYMD(f.end);
+      safeArr(idx.faultsByMac.get(mac.id)).forEach(f => {
+        if(!f || f.status !== "closed" || f.type === "bakim" || f.type === "is_emri") return;
+        const refDate = f.end || f.start;
+        if(filtMonth && refDate) {
+          const ymd = toYMD(refDate);
           if(ymd && !ymd.startsWith(filtMonth)) return; 
         }
         
@@ -1529,10 +1698,10 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
         }
       });
       
-      safeArr(data.maintenance).filter(m => m && m.macId === mac.id).forEach(m => {
-          const cat = safeArr(data.categories).find(c => c && c.id === mac.catId) || {};
+      const macCat = idx.catById.get(mac.catId) || {};
+      safeArr(idx.maintByMac.get(mac.id)).forEach(m => {
           const hasCustomTpl = mac.templates && Object.keys(safeObj(mac.templates)).length > 0;
-          const tpls = safeObj(hasCustomTpl ? mac.templates : (cat.templates || {}));
+          const tpls = safeObj(hasCustomTpl ? mac.templates : (macCat.templates || {}));
           
           let tName = m.type;
           if (tpls[m.type] && tpls[m.type].label) tName = tpls[m.type].label;
@@ -1578,7 +1747,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
     const avgOilDays = oilGapCount > 0 ? Math.round((totalOilGaps / oilGapCount) / 86400000) : null;
 
     return { list: processed, topDowntime, topFaults, topReason, globalMttr, avgOilDays };
-  }, [data.machines, data.faults, data.maintenance, data.categories, filtCat, filtMonth]);
+  }, [data.machines, idx, filtCat, filtMonth]);
 
   const downloadCSV = (type) => {
     let csvContent = "\uFEFF"; // Türkçe karakterlerin (Ş, Ğ, İ vb.) Excel'de bozulmaması için BOM işareti
@@ -1753,7 +1922,9 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
     <div style={{padding:24, maxWidth:1200, margin:"0 auto"}}>
       <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:10, marginBottom:20}}>
         <div><h1 style={{fontSize:26, fontWeight:900}}><span style={{color:"var(--blue)"}}>Pro-X</span> CMMS <InfoBtn msg="Bilgisayarlı Bakım Yönetim Sistemi (Computerized Maintenance Management System)" /></h1></div>
-        <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
+        <div style={{display:"flex", gap:8, flexWrap:"wrap", alignItems:"center"}}>
+          <button className="btn btn-ghost btn-sm" onClick={() => fetchData()} title="Verileri şimdi yenile">⟳ Yenile</button>
+          {lastSync && <span style={{fontSize:10, color:"var(--mute)", whiteSpace:"nowrap"}}>Son: {fmtSync(lastSync)}</span>}
           <button className="btn btn-amber" onClick={() => setPg("qr")}>🔳 QR & Barkod</button>
           <button className="btn btn-ghost" onClick={() => setPg("mob")}>📱 Saha Uygulaması</button>
           <button className="btn btn-ghost" onClick={() => checkPw(() => setModal({type:"settings"}))}>⚙️ Ayarlar</button>
@@ -1840,7 +2011,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
                     
                     Object.entries(tpls).forEach(([key, tpl]) => {
                       if(!tpl) return;
-                      const last = safeArr(data.maintenance).filter(mnt => mnt && mnt.macId === m.id && mnt.type === key).sort((a,b)=>safeTime(b.date)-safeTime(a.date))[0];
+                      const last = idx.lastMaint.get(m.id + "|" + key);
                       const pDays = Number(tpl.periodDays) || 0;
                       let diffDays = -999, progress = 0;
                       if(last && last.date && !isNaN(new Date(last.date).getTime())) {
@@ -1855,7 +2026,7 @@ const Dash = ({ data, setPg, checkPw, setModal, setRepTgt, sendData, fetchData, 
                     const isChecked = bulkMacs.some(x => x.id === m.id);
                     
                     // --- DURUM VE ALARM MANTIĞI KONTROL MERKEZİ ---
-                    const openTickets = safeArr(data.faults).filter(f => f.macId === m.id && f.status === "open");
+                    const openTickets = idx.openFaultsByMac.get(m.id) || [];
                     
                     const activeF = openTickets.find(f => f.type !== "is_emri" && !(f.type === "ariza" && String(f.desc).includes("[ÇALIŞIYOR]")));
                     const dueSpecialTask = openTickets.find(f => f.type === "is_emri" && new Date(f.start).getTime() <= todayMs);
@@ -2435,6 +2606,14 @@ function App() {
   const [data, setData] = useState({ categories: [], machines: [], faults: [], maintenance: [] });
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
+  const [lastSync, setLastSync] = useState(null);
+  
+  const inFlight = useRef(false);
+  const hashRef = useRef(null);
+  const lastSyncRef = useRef(0);
+  const lastAttemptRef = useRef(0);
+  const cacheReadyRef = useRef(false);
+  const pendingRefreshRef = useRef(false);
   
   const [settings, setSettings] = useState(() => {
     try {
@@ -2465,44 +2644,101 @@ function App() {
     if(p === "137998") { setPwUnlocked(true); cb(); } else if(p !== null) alert("Yanlış Şifre!");
   };
 
-  const fetchData = (silent = false) => {
-    if(!silent) setLoading(true);
-    fetch(GOOGLE_SCRIPT_URL)
-      .then(r => r.json())
-      .then(resp => {
-        if(resp.result === "success") {
-          const cats = safeArr(resp.data.categories).slice(1).map(r => ({ id: r[0], name: r[1], reasons: safeArr(parseJSON(r[2], [])), templates: safeObj(parseJSON(r[3], {})) }));
-          let macs = safeArr(resp.data.machines).slice(1).map(r => ({ id: r[0], catId: r[1], name: r[2], brand: r[3], model: r[4], status: r[5], templates: safeObj(parseJSON(r[6], {})) }));
-          const flts = safeArr(resp.data.faults).slice(1).map(r => ({ id: r[0], macId: r[1], type: r[2], reason: r[3], desc: r[4], by: r[5], start: r[6], status: r[7], closedBy: r[8], closeNote: r[9], materials: r[10], end: r[11], downtime: r[12] }));
-          const mnts = safeArr(resp.data.maintenance).slice(1).map(r => ({ id: r[0], macId: r[1], type: r[2], by: r[3], date: r[4], checks: r[5], notes: r[6] }));
-          
-          macs = macs.map(m => {
-              const openF = flts.filter(f => f.macId === m.id && f.status === "open");
-              let isStopped = false, isFault = false;
-              openF.forEach(f => {
-                  if (f.type === "durus") isStopped = true;
-                  if (f.type === "ariza" && !String(f.desc).includes("[ÇALIŞIYOR]")) isFault = true;
-              });
-              
-              let realStatus = "active"; 
-              
-              if (isFault) realStatus = "fault"; 
-              else if (isStopped) realStatus = "stopped"; 
-              
-              return { ...m, status: realStatus };
-          });
+  const fetchData = useCallback(async (silent = false, force = false) => {
+    if (inFlight.current) { pendingRefreshRef.current = true; return; }
+    inFlight.current = true;
+    lastAttemptRef.current = Date.now();
+    if (!silent) setLoading(true);
+    try {
+      const r = await fetch(GOOGLE_SCRIPT_URL, { cache: "no-store" });
+      const text = await r.text();
+      const hash = hashStr(text);
 
-          setData({ categories: cats, machines: macs, faults: flts, maintenance: mnts });
-        }
-        if(!silent) setLoading(false);
-      }).catch(e => { if(!silent) setLoading(false); showToast("Bağlantı Hatası"); });
-  };
+      // Veri değişmediyse JSON'u tekrar işleme ve ekranı yeniden çizme.
+      if (!force && hashRef.current && hash === hashRef.current) {
+        lastSyncRef.current = Date.now();
+        setLastSync(new Date(lastSyncRef.current));
+        return;
+      }
 
-  useEffect(() => { 
-    fetchData(); 
-    const intv = setInterval(() => fetchData(true), 60000);
-    return () => clearInterval(intv);
+      const resp = JSON.parse(text);
+      if (resp.result !== "success") {
+        if (!silent) alert("Hata: " + (resp.message || "Bilinmeyen hata"));
+        return;
+      }
+
+      hashRef.current = hash;
+      const nextData = buildData(resp.data);
+      if (React.startTransition) React.startTransition(() => setData(nextData));
+      else setData(nextData);
+      cacheReadyRef.current = true;
+      lastSyncRef.current = Date.now();
+      setLastSync(new Date(lastSyncRef.current));
+
+      // Bir sonraki açılışta veri anında görünsün diye yerel önbelleğe yaz.
+      const snapshot = { v: CACHE_VERSION, hash, savedAt: lastSyncRef.current, raw: resp.data };
+      const persist = () => cacheSet(snapshot).catch(() => {});
+      if (window.requestIdleCallback) window.requestIdleCallback(persist, { timeout: 4000 });
+      else setTimeout(persist, 800);
+    } catch (e) {
+      if (!silent) {
+        if (cacheReadyRef.current) setToast("Çevrimdışı: son kayıtlar gösteriliyor");
+        else alert("Bağlantı Hatası");
+        setTimeout(() => setToast(null), 3000);
+      }
+    } finally {
+      inFlight.current = false;
+      if (!silent) setLoading(false);
+      if (pendingRefreshRef.current) {
+        pendingRefreshRef.current = false;
+        setTimeout(() => fetchData(true), 0);
+      }
+    }
   }, []);
+
+  // Önce yerel önbelleği göster, sonra arka planda güncelle.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const cached = await cacheGet();
+        if (!cancelled && cached && cached.v === CACHE_VERSION && cached.raw) {
+          hashRef.current = cached.hash || null;
+          setData(buildData(cached.raw));
+          lastSyncRef.current = cached.savedAt || 0;
+          setLastSync(cached.savedAt ? new Date(cached.savedAt) : null);
+          cacheReadyRef.current = true;
+          setLoading(false);
+        }
+      } catch (e) { /* önbellek yoksa sorun değil */ }
+      if (!cancelled) fetchData(cacheReadyRef.current);
+    })();
+    return () => { cancelled = true; };
+  }, [fetchData]);
+
+  // Sekme görünürken 5 dakikada bir, gizliyken hiç senkron yapma.
+  useEffect(() => {
+    const shouldSync = () => {
+      const last = Math.max(lastSyncRef.current, lastAttemptRef.current);
+      return Date.now() - last >= SYNC_INTERVAL_MS;
+    };
+    const tick = () => {
+      if (document.visibilityState === "visible" && shouldSync()) fetchData(true);
+    };
+    const intv = setInterval(tick, 60000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && Date.now() - lastSyncRef.current >= 60000 &&
+          Date.now() - lastAttemptRef.current >= 60000) fetchData(true);
+    };
+    const onOnline = () => fetchData(true);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onOnline);
+    return () => {
+      clearInterval(intv);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", onOnline);
+    };
+  }, [fetchData]);
 
   const sendData = (action, payload, silent = false) => {
     if(!silent) setLoading(true);
@@ -2523,7 +2759,7 @@ function App() {
         {toast && <div className="toast">{toast}</div>}
         {loading && <div className="loading"><div className="spinner"></div><div>Veriler Eşitleniyor...</div></div>}
         
-        {pg === "dash" && <Dash data={data} setPg={setPg} checkPw={checkPw} setModal={setModal} setRepTgt={setRepTgt} sendData={sendData} fetchData={fetchData} settings={settings} />}
+        {pg === "dash" && <Dash data={data} setPg={setPg} checkPw={checkPw} setModal={setModal} setRepTgt={setRepTgt} sendData={sendData} fetchData={fetchData} settings={settings} lastSync={lastSync} />}
         {pg === "mob" && <Mobile data={data} setPg={setPg} sendData={sendData} initialMacId={qrMacId} setRepTgt={setRepTgt} />}
         {pg === "qr" && <QRPage data={data} setPg={setPg} />}
         
